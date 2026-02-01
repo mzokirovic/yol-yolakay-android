@@ -1,37 +1,29 @@
-package com.example.yol_yolakay.feature.main
+package com.example.yol_yolakay.main
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
+import androidx.navigation.toRoute
 import com.example.yol_yolakay.navigation.Screen
-
-// Boshqa feature ekranlarini import qilamiz
 import com.example.yol_yolakay.feature.search.SearchScreen
+import com.example.yol_yolakay.feature.search.TripListScreen
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.trips.MyTripsScreen
 import com.example.yol_yolakay.feature.inbox.InboxScreen
 import com.example.yol_yolakay.feature.profile.ProfileScreen
 
-// Menyu elementlari uchun model
-data class BottomNavItem<T : Any>(
+// Klassni soddalashtirdik
+data class BottomNavItem(
     val name: String,
-    val route: T,
+    val route: Any,
     val icon: ImageVector
 )
 
@@ -39,7 +31,7 @@ data class BottomNavItem<T : Any>(
 fun MainScreen() {
     val navController = rememberNavController()
 
-    // 5 ta asosiy menyu
+    // Bottom menyu elementlari
     val bottomNavItems = listOf(
         BottomNavItem("Qidiruv", Screen.Search, Icons.Default.Search),
         BottomNavItem("E'lon", Screen.Publish, Icons.Default.AddCircle),
@@ -52,11 +44,11 @@ fun MainScreen() {
         bottomBar = {
             NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
+                val currentDest = navBackStackEntry?.destination
 
                 bottomNavItems.forEach { item ->
-                    // Hozir qaysi menyu tanlanganini tekshirish
-                    val isSelected = currentDestination?.hierarchy?.any {
+                    // Type-safe tekshiruv: hasRoute endi ob'ektning o'zini (item.route) qabul qiladi
+                    val isSelected = currentDest?.hierarchy?.any {
                         it.hasRoute(item.route::class)
                     } == true
 
@@ -64,7 +56,6 @@ fun MainScreen() {
                         selected = isSelected,
                         onClick = {
                             navController.navigate(item.route) {
-                                // Bosilganda navigation tarixini tozalash (Back button muammosini oldini olish)
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
@@ -73,39 +64,39 @@ fun MainScreen() {
                             }
                         },
                         label = { Text(item.name) },
-                        icon = {
-                            Icon(
-                                imageVector = item.icon,
-                                contentDescription = item.name
-                            )
-                        }
+                        icon = { Icon(item.icon, contentDescription = item.name) }
                     )
                 }
             }
         }
     ) { innerPadding ->
-        // Bu yerda ekranlar almashinadi
         NavHost(
             navController = navController,
             startDestination = Screen.Search,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Har bir menyu uchun qaysi Screen ochilishini ko'rsatamiz
             composable<Screen.Search> {
-                SearchScreen() // Biz yasagan Search kartasi shu yerda ochiladi
+                SearchScreen(
+                    onSearchClick = { from: String, to: String, date: String, pass: Int ->
+                        navController.navigate(Screen.TripList(from, to, date, pass))
+                    }
+                )
             }
-            composable<Screen.Publish> {
-                PublishScreen()
+
+            composable<Screen.TripList> { backStackEntry ->
+                val args = backStackEntry.toRoute<Screen.TripList>()
+                TripListScreen(
+                    from = args.from,
+                    to = args.to,
+                    date = args.date,
+                    onBack = { navController.popBackStack() }
+                )
             }
-            composable<Screen.MyTrips> {
-                MyTripsScreen()
-            }
-            composable<Screen.Inbox> {
-                InboxScreen()
-            }
-            composable<Screen.Profile> {
-                ProfileScreen()
-            }
+
+            composable<Screen.Publish> { PublishScreen() }
+            composable<Screen.MyTrips> { MyTripsScreen() }
+            composable<Screen.Inbox> { InboxScreen() }
+            composable<Screen.Profile> { ProfileScreen() }
         }
     }
 }

@@ -15,7 +15,7 @@ object BackendClient {
     // MUHIM: Renderdagi URLingizni shu yerga qo'ying.
     // Oxirida "/api/" bo'lishi shart (chunki backend route shunday tuzilgan)
     // ---------------------------------------------------------------------
-    private const val BASE_URL = "https://yol-yolakay-backend.onrender.com/api/"
+    private const val BASE_URL = "https://yol-yolakay-backend.onrender.com/"
     // ^^^ Yuqoridagi manzilni o'zingizning Render URLingizga almashtiring!
 
     val client = HttpClient(Android) {

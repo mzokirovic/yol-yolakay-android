@@ -7,13 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,26 +25,33 @@ import java.util.Calendar
 
 @Composable
 fun SearchScreen(
-    viewModel: SearchViewModel = viewModel()
+    viewModel: SearchViewModel = viewModel(),
+    onSearchClick: (String, String, String, Int) -> Unit // Navigatsiya uchun qo'shildi
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Orqa fon (Xarita o'rniga placeholder)
         MapPlaceholder()
 
-        // Asosiy Qidiruv Kartasi
         SearchCard(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(16.dp)
-                .statusBarsPadding(), // Status bar tepasiga chiqib ketmasligi uchun
+                .statusBarsPadding(),
             uiState = uiState,
             onFromChange = viewModel::onFromLocationChange,
             onToChange = viewModel::onToLocationChange,
             onSwap = viewModel::onSwapLocations,
             onDateChange = viewModel::onDateChange,
-            onPassengersChange = viewModel::onPassengersChange
+            onPassengersChange = viewModel::onPassengersChange,
+            onSearchSubmit = { // Tugma bosilganda ishlaydi
+                onSearchClick(
+                    uiState.fromLocation,
+                    uiState.toLocation,
+                    uiState.date.toString(),
+                    uiState.passengers
+                )
+            }
         )
     }
 }
@@ -62,7 +64,8 @@ fun SearchCard(
     onToChange: (String) -> Unit,
     onSwap: () -> Unit,
     onDateChange: (LocalDate) -> Unit,
-    onPassengersChange: (Int) -> Unit
+    onPassengersChange: (Int) -> Unit,
+    onSearchSubmit: () -> Unit // Parametr sifatida qo'shildi
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -71,7 +74,6 @@ fun SearchCard(
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-
             // 1. Manzillar (From -> To)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LocationTimeline()
@@ -91,44 +93,26 @@ fun SearchCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             // 2. Sana va Odam soni
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Sana tanlash
-                DatePickerButton(
-                    date = uiState.date,
-                    onDateSelected = onDateChange,
-                    modifier = Modifier.weight(1f)
-                )
-
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                DatePickerButton(date = uiState.date, onDateSelected = onDateChange, modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(12.dp))
-
-                // Odam soni
-                PassengerCounter(
-                    count = uiState.passengers,
-                    onCountChange = onPassengersChange
-                )
+                PassengerCounter(count = uiState.passengers, onCountChange = onPassengersChange)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // 3. Qidirish Tugmasi
             Button(
-                onClick = { /* API Call */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                onClick = onSearchSubmit, // Navigatsiya funksiyasi ulandi
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Qidirish", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
+
 
 // --- Kichik UI Bo'laklari ---
 

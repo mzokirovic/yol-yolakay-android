@@ -51,7 +51,6 @@ dependencies {
     // Supabase & Ktor
     implementation(libs.supabase.gotrue)    // Login uchun
     implementation(libs.supabase.postgrest) // Baza uchun
-    implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.core)
 
     implementation(libs.androidx.material.icons.extended)

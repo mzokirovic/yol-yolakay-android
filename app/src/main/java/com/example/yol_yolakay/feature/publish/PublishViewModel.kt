@@ -73,13 +73,13 @@ class PublishViewModel : ViewModel() {
                     time = currentState.time.format(DateTimeFormatter.ofPattern("HH:mm")),
                     price = currentState.price.toDoubleOrNull() ?: 0.0,
                     seats = currentState.passengers,
-                    driverId = "test-driver-uzb-001" // Vaqtincha ID
+                    driverId = "0ed9def9-ae36-422d-a6c1-fb45dbd9b90a" // Vaqtincha ID
                 )
 
                 println("🚀 Serverga yuborilyapti: $tripDto")
 
                 // 2. Render serveriga POST so'rov yuboramiz
-                val response = BackendClient.client.post("trips/publish") {
+                val response = BackendClient.client.post("api/trips/publish") {
                     contentType(ContentType.Application.Json)
                     setBody(tripDto)
                 }
