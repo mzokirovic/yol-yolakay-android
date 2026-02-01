@@ -13,13 +13,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.publish.steps.*
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublishScreen(
-    viewModel: PublishViewModel = viewModel()
+    viewModel: PublishViewModel = viewModel(),
+    onPublished: () -> Unit
 ) {
+
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.isPublished) {
+        if (uiState.isPublished) {
+            delay(1200)          // 1.2s “✅ E’lon yaratildi!” ko‘rinib tursin
+            onPublished()        // navigatsiya
+            viewModel.resetAfterPublish() // qaytib kelganda qayta trigger bo‘lmasin
+        }
+    }
+
 
     // PROGRESS BAR UCHUN SILLIQ ANIMATSIYA
     val animatedProgress by animateFloatAsState(
@@ -58,15 +70,26 @@ fun PublishScreen(
             )
         },
         bottomBar = {
+            val isLast = uiState.currentStep == PublishStep.PREVIEW
+
             Button(
                 onClick = { viewModel.onNext() },
-                enabled = uiState.isNextEnabled,
+                enabled = uiState.isNextEnabled && !uiState.isPublishing && !uiState.isPublished,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
                     .height(56.dp)
             ) {
-                Text(if (uiState.currentStep == PublishStep.PREVIEW) "E'lon qilish" else "Davom etish")
+                if (uiState.isPublishing) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("Yuborilyapti...")
+                } else {
+                    Text(if (isLast) "E'lon qilish" else "Davom etish")
+                }
             }
         }
     ) { padding ->
@@ -76,6 +99,26 @@ fun PublishScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
+
+
+            if (uiState.publishError != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = uiState.publishError!!,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            if (uiState.isPublished) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "✅ E'lon yaratildi!",
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+
+
             // SAHIFA ALMASHISH ANIMATSIYASI (Aqlli Slide)
             AnimatedContent(
                 targetState = uiState.currentStep,

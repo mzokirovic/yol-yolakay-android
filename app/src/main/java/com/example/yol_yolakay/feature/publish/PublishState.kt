@@ -23,7 +23,12 @@ data class PublishUiState(
     val date: LocalDate = LocalDate.now(),
     val time: LocalTime = LocalTime.now(),
     val passengers: Int = 1,
-    val price: String = ""
+    val price: String = "",
+
+    // Network/UI holatlar
+    val isPublishing: Boolean = false,
+    val publishError: String? = null,
+    val isPublished: Boolean = false
 ) {
     // Tugma "Enable" bo'lishi uchun shartlar
     val isNextEnabled: Boolean
@@ -32,9 +37,15 @@ data class PublishUiState(
             PublishStep.TO -> toLocation.isNotBlank()
             PublishStep.DATE -> true
             PublishStep.TIME -> true
-            PublishStep.PASSENGERS -> passengers > 0
+            PublishStep.PASSENGERS -> passengers in 1..4
             PublishStep.PRICE -> price.isNotBlank() && price.all { it.isDigit() }
-            PublishStep.PREVIEW -> true
+
+            // ✅ PREVIEW'da ham hammasi valid bo'lsa enable
+            PublishStep.PREVIEW ->
+                fromLocation.isNotBlank() &&
+                        toLocation.isNotBlank() &&
+                        passengers in 1..4 &&
+                        price.isNotBlank() && price.all { it.isDigit() }
         }
 
     // Progress bar uchun (0.0 dan 1.0 gacha)
