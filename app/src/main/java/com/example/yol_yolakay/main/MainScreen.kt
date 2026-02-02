@@ -13,7 +13,12 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.navigation.toRoute
 import com.example.yol_yolakay.feature.inbox.InboxScreen
+import com.example.yol_yolakay.feature.inbox.ThreadScreen
+import com.example.yol_yolakay.feature.profile.LanguageScreen
+import com.example.yol_yolakay.feature.profile.PaymentMethodsScreen
+import com.example.yol_yolakay.feature.profile.ProfileEditScreen
 import com.example.yol_yolakay.feature.profile.ProfileScreen
+import com.example.yol_yolakay.feature.profile.VehicleScreen
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.search.SearchScreen
 import com.example.yol_yolakay.feature.search.TripListScreen
@@ -46,9 +51,34 @@ fun MainScreen() {
                 val currentDest = navBackStackEntry?.destination
 
                 bottomNavItems.forEach { item ->
-                    val isSelected = currentDest?.hierarchy?.any {
-                        it.hasRoute(item.route::class)
-                    } == true
+
+                    val isSelected = when (item.route) {
+
+                        // ✅ Profile tab selected bo‘lib turishi (sub-screenlarda ham)
+                        Screen.Profile -> {
+                            currentDest?.hierarchy?.any { dest ->
+                                dest.hasRoute(Screen.Profile::class) ||
+                                        dest.hasRoute(Screen.ProfileEdit::class) ||
+                                        dest.hasRoute(Screen.Vehicle::class) ||
+                                        dest.hasRoute(Screen.Language::class) ||
+                                        dest.hasRoute(Screen.PaymentMethods::class)
+                            } == true
+                        }
+
+                        // ✅ Inbox tab selected bo‘lib turishi (Thread screen ichida ham)
+                        Screen.Inbox -> {
+                            currentDest?.hierarchy?.any { dest ->
+                                dest.hasRoute(Screen.Inbox::class) ||
+                                        dest.hasRoute(Screen.Thread::class)
+                            } == true
+                        }
+
+                        else -> {
+                            currentDest?.hierarchy?.any {
+                                it.hasRoute(item.route::class)
+                            } == true
+                        }
+                    }
 
                     NavigationBarItem(
                         selected = isSelected,
@@ -68,6 +98,7 @@ fun MainScreen() {
             }
         }
     ) { innerPadding ->
+
         NavHost(
             navController = navController,
             startDestination = Screen.Search,
@@ -96,14 +127,21 @@ fun MainScreen() {
                 )
             }
 
-            // ✅ Trip Details
             composable<Screen.TripDetails> { backStackEntry ->
                 val args = backStackEntry.toRoute<Screen.TripDetails>()
                 TripDetailsScreen(
                     tripId = args.id,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { threadId ->
+                        navController.navigate(Screen.Thread(threadId))
+                    },
+                    onOpenInbox = {
+                        navController.navigate(Screen.Inbox)
+                    }
                 )
             }
+
+
 
             composable<Screen.Publish> {
                 PublishScreen(
@@ -124,8 +162,48 @@ fun MainScreen() {
                     }
                 )
             }
-            composable<Screen.Inbox> { InboxScreen() }
-            composable<Screen.Profile> { ProfileScreen() }
+
+            // ✅ Inbox list
+            composable<Screen.Inbox> {
+                InboxScreen(
+                    onOpenThread = { threadId ->
+                        navController.navigate(Screen.Thread(threadId))
+                    }
+                )
+            }
+
+            // ✅ Chat screen
+            composable<Screen.Thread> { backStackEntry ->
+                val args = backStackEntry.toRoute<Screen.Thread>()
+                ThreadScreen(
+                    threadId = args.id,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // ✅ Profile (tab)
+            composable<Screen.Profile> {
+                ProfileScreen(
+                    onNavigate = { route -> navController.navigate(route) }
+                )
+            }
+
+            // ✅ Profile sub-screens
+            composable<Screen.ProfileEdit> {
+                ProfileEditScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable<Screen.Vehicle> {
+                VehicleScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable<Screen.Language> {
+                LanguageScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable<Screen.PaymentMethods> {
+                PaymentMethodsScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

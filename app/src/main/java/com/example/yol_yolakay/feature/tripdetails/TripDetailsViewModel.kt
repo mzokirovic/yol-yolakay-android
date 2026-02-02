@@ -35,10 +35,11 @@ class TripDetailsViewModel : ViewModel() {
         _uiState.update { it.copy(selectedSeatNo = null) }
     }
 
-    fun bookSelectedSeat(tripId: String, seatNo: Int, clientId: String, holderName: String? = null) {
+    // Passenger: request
+    fun requestSeat(tripId: String, seatNo: Int, userId: String, holderName: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBooking = true, error = null) }
-            repo.bookSeat(tripId, seatNo, clientId, holderName)
+            repo.requestSeat(tripId, seatNo, userId, holderName)
                 .onSuccess { resp ->
                     _uiState.update {
                         it.copy(
@@ -55,11 +56,32 @@ class TripDetailsViewModel : ViewModel() {
         }
     }
 
-    // ✅ Driver actions
-    fun blockSeat(tripId: String, seatNo: Int) {
+    // Passenger: cancel request
+    fun cancelRequest(tripId: String, seatNo: Int, userId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isBooking = true, error = null) } // reuse flag (MVP)
-            repo.blockSeat(tripId, seatNo)
+            _uiState.update { it.copy(isBooking = true, error = null) }
+            repo.cancelSeatRequest(tripId, seatNo, userId)
+                .onSuccess { resp ->
+                    _uiState.update {
+                        it.copy(
+                            isBooking = false,
+                            trip = resp.trip,
+                            seats = resp.seats,
+                            selectedSeatNo = null
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isBooking = false, error = e.message) }
+                }
+        }
+    }
+
+    // Driver: approve
+    fun approveSeat(tripId: String, seatNo: Int, driverId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBooking = true, error = null) }
+            repo.approveSeat(tripId, seatNo, driverId)
                 .onSuccess { resp ->
                     _uiState.update { it.copy(isBooking = false, trip = resp.trip, seats = resp.seats, selectedSeatNo = null) }
                 }
@@ -69,10 +91,38 @@ class TripDetailsViewModel : ViewModel() {
         }
     }
 
-    fun unblockSeat(tripId: String, seatNo: Int) {
+    // Driver: reject
+    fun rejectSeat(tripId: String, seatNo: Int, driverId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBooking = true, error = null) }
-            repo.unblockSeat(tripId, seatNo)
+            repo.rejectSeat(tripId, seatNo, driverId)
+                .onSuccess { resp ->
+                    _uiState.update { it.copy(isBooking = false, trip = resp.trip, seats = resp.seats, selectedSeatNo = null) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isBooking = false, error = e.message) }
+                }
+        }
+    }
+
+    // Driver: block/unblock
+    fun blockSeat(tripId: String, seatNo: Int, driverId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBooking = true, error = null) }
+            repo.blockSeat(tripId, seatNo, driverId)
+                .onSuccess { resp ->
+                    _uiState.update { it.copy(isBooking = false, trip = resp.trip, seats = resp.seats, selectedSeatNo = null) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isBooking = false, error = e.message) }
+                }
+        }
+    }
+
+    fun unblockSeat(tripId: String, seatNo: Int, driverId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBooking = true, error = null) }
+            repo.unblockSeat(tripId, seatNo, driverId)
                 .onSuccess { resp ->
                     _uiState.update { it.copy(isBooking = false, trip = resp.trip, seats = resp.seats, selectedSeatNo = null) }
                 }

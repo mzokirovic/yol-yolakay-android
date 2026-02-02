@@ -2,6 +2,7 @@ package com.example.yol_yolakay.feature.publish.model
 
 import kotlinx.serialization.Serializable
 
+
 @Serializable
 data class PublishTripRequest(
     val fromLocation: String,

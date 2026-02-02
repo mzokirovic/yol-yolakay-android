@@ -20,4 +20,13 @@ sealed interface Screen {
 
     @Serializable data object Login : Screen
     @Serializable data class TripDetails(val id: String) : Screen
+
+    // Profile sub screens
+    @Serializable data object ProfileEdit : Screen
+    @Serializable data object Vehicle : Screen
+    @Serializable data object Language : Screen
+    @Serializable data object PaymentMethods : Screen
+
+    // Inbox / Chat
+    @Serializable data class Thread(val id: String) : Screen
 }
