@@ -12,6 +12,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.navigation.toRoute
+import com.example.yol_yolakay.feature.inbox.InboxHubScreen
 import com.example.yol_yolakay.feature.inbox.InboxScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
 import com.example.yol_yolakay.feature.profile.LanguageScreen
@@ -25,6 +26,10 @@ import com.example.yol_yolakay.feature.search.TripListScreen
 import com.example.yol_yolakay.feature.tripdetails.TripDetailsScreen
 import com.example.yol_yolakay.feature.trips.MyTripsScreen
 import com.example.yol_yolakay.navigation.Screen
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
+import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
 
 data class BottomNavItem(
     val name: String,
@@ -35,6 +40,10 @@ data class BottomNavItem(
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    val ctx = LocalContext.current
+
+    val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
+    val unread = notifVm.state.unreadCount
 
     val bottomNavItems = listOf(
         BottomNavItem("Qidiruv", Screen.Search, Icons.Default.Search),
@@ -92,7 +101,15 @@ fun MainScreen() {
                             }
                         },
                         label = { Text(item.name) },
-                        icon = { Icon(item.icon, contentDescription = item.name) }
+                        icon = {
+                            if (item.route == Screen.Inbox && unread > 0) {
+                                BadgedBox(badge = { Badge { Text(unread.toString()) } }) {
+                                    Icon(item.icon, contentDescription = item.name)
+                                }
+                            } else {
+                                Icon(item.icon, contentDescription = item.name)
+                            }
+                        }
                     )
                 }
             }
@@ -163,14 +180,19 @@ fun MainScreen() {
                 )
             }
 
-            // ✅ Inbox list
+            // ✅ Inbox hub (Chats + Updates)
             composable<Screen.Inbox> {
-                InboxScreen(
+                InboxHubScreen(
                     onOpenThread = { threadId ->
                         navController.navigate(Screen.Thread(threadId))
-                    }
+                    },
+                    onOpenTrip = { tripId ->
+                        navController.navigate(Screen.TripDetails(tripId))
+                    },
+                    notifVm = notifVm
                 )
             }
+
 
             // ✅ Chat screen
             composable<Screen.Thread> { backStackEntry ->
