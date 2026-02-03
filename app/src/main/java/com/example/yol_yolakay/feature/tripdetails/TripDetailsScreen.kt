@@ -4,26 +4,34 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.inbox.InboxRemoteRepository
 import com.example.yol_yolakay.feature.tripdetails.components.SeatMap
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -60,10 +68,10 @@ fun TripDetailsScreen(
     val canChatWithDriver = !driverId.isNullOrBlank()
     val canOpenChat = isDriver || (iBooked && canChatWithDriver)
 
-    // --- Pretty date/time ---
+    // --- Formatlash ---
     val dep = remember(trip?.departureTime) { trip?.departureTime?.let(::parseDeparture) }
     val datePretty = remember(dep) {
-        dep?.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("uz")))
+        dep?.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale("uz")))
             ?.replaceFirstChar { it.uppercase() } ?: "—"
     }
     val timePretty = remember(dep) { dep?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—:—" }
@@ -77,30 +85,22 @@ fun TripDetailsScreen(
         tripId = tripId,
         isBusy = ui.isBooking,
         onDismiss = viewModel::closeSeatSheet,
-        onRequest = { seatNo ->
-            viewModel.requestSeat(tripId = tripId, seatNo = seatNo, userId = clientId, holderName = null)
-        },
-        onCancel = { seatNo ->
-            viewModel.cancelRequest(tripId = tripId, seatNo = seatNo, userId = clientId)
-        },
-        onApprove = { seatNo ->
-            viewModel.approveSeat(tripId = tripId, seatNo = seatNo, driverId = clientId)
-        },
-        onReject = { seatNo ->
-            viewModel.rejectSeat(tripId = tripId, seatNo = seatNo, driverId = clientId)
-        },
-        onBlock = { seatNo ->
-            viewModel.blockSeat(tripId = tripId, seatNo = seatNo, driverId = clientId)
-        },
-        onUnblock = { seatNo ->
-            viewModel.unblockSeat(tripId = tripId, seatNo = seatNo, driverId = clientId)
-        }
+        onRequest = { seatNo -> viewModel.requestSeat(tripId, seatNo, clientId, null) },
+        onCancel = { seatNo -> viewModel.cancelRequest(tripId, seatNo, clientId) },
+        onApprove = { seatNo -> viewModel.approveSeat(tripId, seatNo, clientId) },
+        onReject = { seatNo -> viewModel.rejectSeat(tripId, seatNo, clientId) },
+        onBlock = { seatNo -> viewModel.blockSeat(tripId, seatNo, clientId) },
+        onUnblock = { seatNo -> viewModel.unblockSeat(tripId, seatNo, clientId) }
     )
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Safar tafsilotlari") },
+                title = { Text("Safar tafsilotlari", fontWeight = FontWeight.SemiBold) },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Orqaga")
@@ -119,22 +119,17 @@ fun TripDetailsScreen(
                         onOpenInbox()
                         return@ChatBottomBar
                     }
-
                     scope.launch {
                         if (!iBooked) {
                             snackbarHostState.showSnackbar("Chat faqat joy band qilingandan keyin ochiladi.")
                             return@launch
                         }
                         if (driverId.isNullOrBlank()) {
-                            snackbarHostState.showSnackbar("driver_id topilmadi. Trip response’da driver_id bo‘lishi kerak.")
+                            snackbarHostState.showSnackbar("Xatolik: Haydovchi ma'lumotlari to'liq emas.")
                             return@launch
                         }
-
                         val tid = trip?.id ?: tripId
-                        val threadId = runCatching {
-                            inboxRepo.createThread(peerId = driverId, tripId = tid)
-                        }.getOrNull()
-
+                        val threadId = runCatching { inboxRepo.createThread(peerId = driverId, tripId = tid) }.getOrNull()
                         if (!threadId.isNullOrBlank()) onOpenThread(threadId)
                         else snackbarHostState.showSnackbar("Chat ochilmadi. Qayta urinib ko‘ring.")
                     }
@@ -142,28 +137,22 @@ fun TripDetailsScreen(
             )
         }
     ) { pad ->
-        Box(
-            modifier = Modifier
-                .padding(pad)
-                .fillMaxSize()
-        ) {
+        Box(modifier = Modifier.padding(pad).fillMaxSize()) {
             when {
                 ui.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-
                 ui.error != null -> ErrorState(
                     message = ui.error!!,
                     onRetry = { viewModel.load(tripId) },
                     modifier = Modifier.align(Alignment.Center)
                 )
-
-                trip == null -> Text("Topilmadi", Modifier.align(Alignment.Center))
-
+                trip == null -> Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center))
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // 1. YANGI TIMELINE HEADER KARTASI
                         item {
                             TripHeaderCard(
                                 datePretty = datePretty,
@@ -175,22 +164,22 @@ fun TripDetailsScreen(
                             )
                         }
 
+                        // 2. Haydovchi haqida
                         item {
                             DriverInfoCard(
                                 driverName = trip.driverName ?: "Haydovchi",
-                                carModel = trip.carModel ?: "Mashina"
+                                carModel = trip.carModel ?: "Mashina modeli yo'q"
                             )
                         }
 
+                        // 3. O'rindiqlar sxemasi
                         item {
                             Text(
-                                "O‘rindiqlar",
+                                "Joyni tanlang",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                             )
-                        }
-
-                        item {
                             SeatSectionCard {
                                 SeatMap(
                                     seats = ui.seats,
@@ -201,49 +190,44 @@ fun TripDetailsScreen(
                             }
                         }
 
+                        // 4. Qo'shimcha info
                         item {
                             AnimatedVisibility(
                                 visible = (!isDriver && iBooked && !canChatWithDriver),
-                                enter = fadeIn(tween(180)),
-                                exit = fadeOut(tween(180))
                             ) {
-                                AssistiveInfo(
-                                    text = "Chat uchun haydovchi ID kerak (driver_id). Backend trip response’da driver_id chiqishini tekshiring."
-                                )
+                                AssistiveInfo(text = "Diqqat: Haydovchi bilan bog'lanishda muammo bo'lsa, iltimos qo'llab-quvvatlash xizmatiga yozing.")
                             }
                         }
-
-                        // Pastki bo‘sh joy: bottomBar ustiga chiqib ketmasin
-                        item { Spacer(Modifier.height(72.dp)) }
                     }
                 }
             }
 
-            // Micro: booking/loading overlay (yengil)
-            AnimatedVisibility(
-                visible = ui.isBooking,
-                enter = fadeIn(tween(120)),
-                exit = fadeOut(tween(120)),
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    tonalElevation = 6.dp,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            // Loading Overlay
+            if (ui.isBooking) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(enabled = false) {},
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text("Bajarilmoqda...", style = MaterialTheme.typography.bodyMedium)
+                    Card(shape = RoundedCornerShape(16.dp)) {
+                        Row(
+                            Modifier.padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(16.dp))
+                            Text("Bajarilmoqda...", fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
             }
         }
     }
 }
+
+// --- YANGILANGAN HEADER VA TIMELINE ---
 
 @Composable
 private fun TripHeaderCard(
@@ -255,43 +239,187 @@ private fun TripHeaderCard(
     availableSeats: Int
 ) {
     Card(
-        shape = MaterialTheme.shapes.extraLarge,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-        )
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
-            Text(datePretty, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Header: Sana va Narx
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = datePretty,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
 
-            Text(
-                "$fromCity  →  $toCity",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text("Chiqish: $timePretty") }
-                )
-                AssistChip(
-                    onClick = {},
-                    label = { Text("${price.toInt()} so‘m") }
+                Text(
+                    text = "${price.toInt()} so‘m",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            Text(
-                "Bo‘sh joylar: $availableSeats",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            Spacer(Modifier.height(24.dp))
+
+            // TIMELINE: Vertikal chiziqli marshrut
+            TripTimeline(
+                departureTime = timePretty,
+                departureCity = fromCity,
+                // Joy nomlari backendda bo'lmasa, shartli nomlar:
+                departurePlace = "Belgilangan joy",
+                arrivalTime = "—:—",
+                arrivalCity = toCity,
+                arrivalPlace = "Shahar markazi"
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            // Footer: Joylar
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DirectionsCar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "$availableSeats ta joy qoldi",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
+
+@Composable
+fun TripTimeline(
+    departureTime: String,
+    departureCity: String,
+    departurePlace: String,
+    arrivalTime: String,
+    arrivalCity: String,
+    arrivalPlace: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min) // Balandlikni ichki elementlarga moslash
+    ) {
+        // 1-USTUN: VAQT
+        Column(
+            modifier = Modifier.width(60.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = departureTime,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = arrivalTime,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // 2-USTUN: CHIZIQ (Timeline)
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Circle,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            // Uzuq-uzuq chiziq (Dashed Line)
+            Canvas(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .padding(vertical = 4.dp)
+            ) {
+                drawLine(
+                    color = Color.LightGray,
+                    start = Offset(0f, 0f),
+                    end = Offset(0f, size.height),
+                    strokeWidth = 4f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+
+        // 3-USTUN: SHAHARLAR
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1f),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = departureCity,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = departurePlace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            Column {
+                Text(
+                    text = arrivalCity,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = arrivalPlace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+// ------------------------------------
 
 @Composable
 private fun DriverInfoCard(
@@ -299,82 +427,86 @@ private fun DriverInfoCard(
     carModel: String
 ) {
     Card(
-        shape = MaterialTheme.shapes.extraLarge,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = MaterialTheme.shapes.large,
-                tonalElevation = 2.dp,
-                modifier = Modifier.size(44.dp)
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(50.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Person, contentDescription = null)
+                    Text(
+                        text = driverName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(16.dp))
 
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(driverName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(carModel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = driverName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = carModel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
+            Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("4.8  •  Tasdiqlangan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "4.8",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
+                Text(
+                    "Tasdiqlangan",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF4CAF50)
+                )
             }
-
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
 private fun SeatSectionCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             content = content
         )
-    }
-}
-
-@Composable
-private fun AssistiveInfo(text: String) {
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = 1.dp,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(12.dp)
-        )
-    }
-}
-
-@Composable
-private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        Spacer(Modifier.height(10.dp))
-        Button(onClick = onRetry) { Text("Qayta urinish") }
     }
 }
 
@@ -385,31 +517,67 @@ private fun ChatBottomBar(
     iBooked: Boolean,
     onClick: () -> Unit
 ) {
-    Surface(tonalElevation = 2.dp) {
-        Row(
+    Surface(
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(16.dp)
+                .safeDrawingPadding()
         ) {
-            FilledTonalButton(
+            Button(
                 onClick = onClick,
                 enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                )
             ) {
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     when {
-                        isDriver -> "Chatlar (yo‘lovchilar bilan)"
+                        isDriver -> "Chatlar (Yo‘lovchilar)"
                         iBooked -> "Haydovchiga yozish"
-                        else -> "Chat (bron qilingandan keyin)"
+                        else -> "Chat (Joy band qilgach)"
                     },
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AssistiveInfo(text: String) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Default.DirectionsCar, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(16.dp))
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry) { Text("Qayta urinish") }
     }
 }
 
@@ -437,116 +605,101 @@ private fun SeatActionBottomSheet(
     val lockedByDriver = seat?.lockedByDriver == true
     val isMine = seat?.holderClientId == clientId
 
-    // MVP+ actions
     val canRequest = !isDriver && status == "available"
     val canCancel = !isDriver && status == "pending" && isMine
-
     val canApprove = isDriver && status == "pending"
     val canReject = isDriver && status == "pending"
-
     val canBlock = isDriver && status == "available"
-    // ✅ driver system blocked’ni ham ochsin (backend ham shuni ko‘tarishi kerak)
     val canUnblock = isDriver && status == "blocked"
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Joy #$selectedSeatNo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Joy №$selectedSeatNo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-            val statusText = when (status) {
-                "available" -> "Bo‘sh"
-                "booked" -> if (isMine) "Sizniki (Band)" else "Band qilingan"
-                "pending" -> if (isMine) "So‘rov yuborilgan (siz)" else "So‘rov yuborilgan"
-                "blocked" -> if (lockedByDriver) "Haydovchi yopgan" else "Yopiq"
-                else -> status
+                val (statusText, statusColor) = when (status) {
+                    "available" -> "Bo‘sh" to Color(0xFF4CAF50)
+                    "booked" -> (if (isMine) "Sizniki" else "Band") to Color.Gray
+                    "pending" -> "Kutilmoqda" to Color(0xFFFF9800)
+                    "blocked" -> "Yopiq" to Color.Red
+                    else -> status to Color.Gray
+                }
+
+                Surface(color = statusColor.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                    Text(
+                        statusText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
-
-            AssistChip(onClick = {}, label = { Text("Holat: $statusText") })
 
             if (status == "booked" || status == "pending") {
-                val who = seat?.holderName?.takeIf { it.isNotBlank() } ?: "Noma’lum"
-                Text("Egas(i): $who", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val who = seat?.holderName?.takeIf { it.isNotBlank() } ?: "Noma’lum yo'lovchi"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Text(who, style = MaterialTheme.typography.bodyLarge)
+                }
+                HorizontalDivider()
             }
-
-            Spacer(Modifier.height(6.dp))
 
             when {
-                canRequest -> {
-                    Button(
-                        onClick = { onRequest(selectedSeatNo) },
-                        enabled = !isBusy,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(if (isBusy) "..." else "So‘rov yuborish") }
-                }
-
-                canCancel -> {
-                    OutlinedButton(
-                        onClick = { onCancel(selectedSeatNo) },
-                        enabled = !isBusy,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(if (isBusy) "..." else "So‘rovni bekor qilish") }
-                }
-
-                !isDriver -> {
-                    OutlinedButton(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            when (status) {
-                                "pending" -> if (isMine) "So‘rov yuborilgan" else "Boshqa yo‘lovchi so‘rov yuborgan"
-                                "booked" -> "Band qilingan"
-                                "blocked" -> "Yopiq"
-                                else -> "Mavjud emas"
-                            }
-                        )
+                canRequest -> PrimaryButton(text = "So‘rov yuborish", isBusy = isBusy) { onRequest(selectedSeatNo) }
+                canCancel -> SecondaryButton(text = "Bekor qilish", isBusy = isBusy) { onCancel(selectedSeatNo) }
+                canApprove || canReject -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.weight(1f)) { SecondaryButton(text = "Rad etish", isBusy = isBusy) { onReject(selectedSeatNo) } }
+                        Box(Modifier.weight(1f)) { PrimaryButton(text = "Qabul qilish", isBusy = isBusy) { onApprove(selectedSeatNo) } }
                     }
                 }
-            }
-
-            if (canApprove) {
-                Button(
-                    onClick = { onApprove(selectedSeatNo) },
-                    enabled = !isBusy,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(if (isBusy) "..." else "Qabul qilish (Approve)") }
-            }
-
-            if (canReject) {
-                OutlinedButton(
-                    onClick = { onReject(selectedSeatNo) },
-                    enabled = !isBusy,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(if (isBusy) "..." else "Rad etish (Reject)") }
-            }
-
-            if (canBlock) {
-                Button(
-                    onClick = { onBlock(selectedSeatNo) },
-                    enabled = !isBusy,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(if (isBusy) "..." else "Seatni yopish (Block)") }
-            }
-
-            if (canUnblock) {
-                OutlinedButton(
-                    onClick = { onUnblock(selectedSeatNo) },
-                    enabled = !isBusy,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(if (isBusy) "..." else "Seatni ochish (Unblock)") }
+                canBlock -> SecondaryButton(text = "Joyni yopish (Block)", isBusy = isBusy) { onBlock(selectedSeatNo) }
+                canUnblock -> SecondaryButton(text = "Joyni ochish (Unblock)", isBusy = isBusy) { onUnblock(selectedSeatNo) }
             }
         }
+    }
+}
+
+@Composable
+private fun PrimaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White) else Text(text)
+    }
+}
+
+@Composable
+private fun SecondaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp)) else Text(text)
     }
 }
 

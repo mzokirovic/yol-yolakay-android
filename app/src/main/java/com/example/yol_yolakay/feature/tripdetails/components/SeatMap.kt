@@ -16,16 +16,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.yol_yolakay.core.network.model.SeatApiModel
 
+// Ranglar statusga qarab o'zgaradi
+private val ColorAvailable = Color(0xFFFFFFFF) // Oq
+private val ColorBookedMine = Color(0xFF4CAF50) // Yashil (Mening joyim)
+private val ColorBookedOthers = Color(0xFFE0E0E0) // Och Kulrang (Birovnikini kulrang qilamiz)
+private val ColorPending = Color(0xFFFF9800) // Orange (Kutilmoqda)
+private val ColorBlocked = Color(0xFFBDBDBD) // To'qroq kulrang (Yopiq)
+
+// Statuslar o'zgarmadi
 private enum class SeatUiStatus { AVAILABLE, BOOKED, PENDING, BLOCKED, MINE_BOOKED }
 
 private fun SeatApiModel.toUiStatus(clientId: String): SeatUiStatus = when (status) {
     "available" -> SeatUiStatus.AVAILABLE
     "pending" -> SeatUiStatus.PENDING
+    // Agar booked bo'lsa va egasi men bo'lsam -> MINE_BOOKED, aks holda shunchaki BOOKED
     "booked" -> if (!holderClientId.isNullOrBlank() && holderClientId == clientId) SeatUiStatus.MINE_BOOKED else SeatUiStatus.BOOKED
     "blocked" -> SeatUiStatus.BLOCKED
     else -> SeatUiStatus.BLOCKED
@@ -44,10 +54,10 @@ fun SeatMap(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
 
-        // Legend (minimal)
+        // Legend (Izohlar)
         SeatLegendRow()
 
-        // Front row (centered)
+        // Old qator (Haydovchi va 1-joy)
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 DriverSeatCard(size = seatSize)
@@ -62,7 +72,7 @@ fun SeatMap(
             }
         }
 
-        // Back row (centered)
+        // Orqa qator (2, 3, 4 - joylar)
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 for (n in listOf(2, 3, 4)) {
@@ -86,34 +96,31 @@ private fun SeatLegendRow() {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        LegendPill(text = "Bo‘sh", kind = "available")
-        LegendPill(text = "So‘rov", kind = "pending")
-        LegendPill(text = "Band", kind = "booked")
-        LegendPill(text = "Mening", kind = "mine")
-        LegendPill(text = "Yopiq", kind = "blocked")
+        LegendPill(text = "Bo‘sh", color = ColorAvailable, isBordered = true)
+        LegendPill(text = "So‘rov", color = ColorPending)
+        LegendPill(text = "Band", color = ColorBookedOthers)
+        LegendPill(text = "Siz", color = ColorBookedMine, contentColor = Color.White)
     }
 }
 
 @Composable
-private fun LegendPill(text: String, kind: String) {
-    val c = when (kind) {
-        "available" -> MaterialTheme.colorScheme.surface
-        "pending" -> MaterialTheme.colorScheme.secondaryContainer
-        "mine" -> MaterialTheme.colorScheme.primaryContainer
-        "booked" -> MaterialTheme.colorScheme.surfaceVariant
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-
+private fun LegendPill(
+    text: String,
+    color: Color,
+    contentColor: Color = Color.Black,
+    isBordered: Boolean = false
+) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
-        tonalElevation = 1.dp,
-        color = c,
+        shape = RoundedCornerShape(50), // To'liq aylana
+        color = color,
+        border = if (isBordered) androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray) else null,
+        modifier = Modifier.padding(2.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = contentColor
         )
     }
 }
@@ -124,10 +131,10 @@ private fun DriverSeatCard(size: androidx.compose.ui.unit.Dp) {
         modifier = Modifier.size(size),
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+        color = ColorBlocked // Haydovchi o'rindig'i ham statik kulrang
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.DirectionsCar, contentDescription = null)
+            Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color.White)
         }
     }
 }
@@ -143,21 +150,38 @@ private fun SeatCard(
 ) {
     val ui = seat?.toUiStatus(clientId) ?: SeatUiStatus.BLOCKED
     val lockedByDriver = seat?.lockedByDriver == true
-    val isMine = seat?.holderClientId == clientId
 
-    // “Calm” palette
+    // --- ASOSIY O'ZGARISH SHU YERDA ---
     val targetBg = when (ui) {
-        SeatUiStatus.AVAILABLE -> MaterialTheme.colorScheme.surface
-        SeatUiStatus.PENDING -> MaterialTheme.colorScheme.secondaryContainer
-        SeatUiStatus.MINE_BOOKED -> MaterialTheme.colorScheme.primaryContainer
-        SeatUiStatus.BOOKED -> MaterialTheme.colorScheme.surfaceVariant
-        SeatUiStatus.BLOCKED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+        SeatUiStatus.AVAILABLE -> ColorAvailable
+
+        // PENDING: Har doim Orange bo'ladi
+        SeatUiStatus.PENDING -> ColorPending
+
+        // MINE_BOOKED: Men band qilganman -> Yashil
+        SeatUiStatus.MINE_BOOKED -> ColorBookedMine
+
+        // BOOKED (Birov band qilgan):
+        // Agar men Haydovchi bo'lsam -> Yashil ko'raman (puli to'langan joy)
+        // Agar men yo'lovchi bo'lsam -> Kulrang ko'raman (band joy)
+        SeatUiStatus.BOOKED -> if (isDriver) ColorBookedMine else ColorBookedOthers
+
+        // BLOCKED: Yopiq joy
+        SeatUiStatus.BLOCKED -> ColorBlocked
     }
+    // ----------------------------------
+
     val bg by animateColorAsState(targetValue = targetBg, animationSpec = tween(180), label = "seatBg")
 
-    // Clickable rules:
-    // Driver: available / blocked / pending / booked ham bosib ko‘rsin (approve/reject/unblock UX uchun)
-    // Passenger: available / pending / booked (read-only) bosishi mumkin
+    // Matn va Ikonka rangini fonga moslash (Kontrast uchun)
+    val contentColor = when {
+        ui == SeatUiStatus.PENDING -> Color.White
+        ui == SeatUiStatus.MINE_BOOKED -> Color.White
+        ui == SeatUiStatus.BOOKED && isDriver -> Color.White // Haydovchi yashil ko'rganda oq yozuv
+        ui == SeatUiStatus.BLOCKED -> Color.White
+        else -> Color.Black // Available va oddiy Booked uchun qora
+    }
+
     val clickable = if (isDriver) {
         true
     } else {
@@ -182,17 +206,19 @@ private fun SeatCard(
                 indication = null
             ) { onSeatClick(seatNo) },
         shape = RoundedCornerShape(16.dp),
-        tonalElevation = if (pressed) 6.dp else 2.dp,
-        color = bg
+        shadowElevation = if (pressed) 6.dp else 2.dp, // tonalElevation o'rniga shadow aniqroq ko'rinadi rangli fonda
+        color = bg,
+        contentColor = contentColor // Matn rangini qo'shdik
     ) {
-        Box(Modifier.fillMaxSize().padding(10.dp)) {
+        Box(Modifier.fillMaxSize().padding(8.dp)) {
 
-            // 🔒 faqat driver bloklagan seatda
+            // Qulf belgisi
             if (ui == SeatUiStatus.BLOCKED && lockedByDriver) {
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = null,
-                    modifier = Modifier.align(Alignment.TopEnd).size(16.dp)
+                    modifier = Modifier.align(Alignment.TopEnd).size(14.dp),
+                    tint = contentColor.copy(alpha = 0.7f)
                 )
             }
 
@@ -216,12 +242,13 @@ private fun SeatCard(
                     Icon(
                         imageVector = Icons.Default.Schedule,
                         contentDescription = null,
-                        modifier = Modifier.align(Alignment.Center).size(20.dp)
+                        modifier = Modifier.align(Alignment.Center).size(24.dp)
                     )
                 }
 
                 SeatUiStatus.BLOCKED -> {
-                    Text("—", modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Bloklanganda chiziqcha
+                    Text("—", modifier = Modifier.align(Alignment.Center))
                 }
 
                 SeatUiStatus.AVAILABLE -> {
@@ -234,13 +261,13 @@ private fun SeatCard(
                 }
             }
 
-            // Small “mine” hint (subtle)
+            // "Siz" degan yozuv (faqat sizniki bo'lsa)
             if (ui == SeatUiStatus.MINE_BOOKED) {
                 Text(
-                    "siz",
+                    "Siz",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.align(Alignment.BottomEnd)
+                    fontSize = androidx.compose.ui.unit.TextUnit.Unspecified, // juda kichik bo'lmasligi uchun
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
         }
