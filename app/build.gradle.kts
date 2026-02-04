@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -42,6 +44,15 @@ android {
 }
 
 dependencies {
+
+    // ✅ Firebase BoM (versiyani bitta joydan boshqaradi)
+    implementation(platform("com.google.firebase:firebase-bom:34.8.0"))
+    // ✅ FCM (endi -ktx ishlatmaymiz)
+    implementation("com.google.firebase:firebase-messaging")
+
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.core:core-ktx:1.13.1")
+
 
     implementation(libs.ktor.client.logging)
     // Internet (Ktor)

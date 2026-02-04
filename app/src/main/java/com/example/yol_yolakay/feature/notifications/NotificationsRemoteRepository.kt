@@ -2,17 +2,29 @@ package com.example.yol_yolakay.feature.notifications
 
 import com.example.yol_yolakay.core.network.BackendClient
 import com.example.yol_yolakay.core.network.model.NotificationApiModel
+import com.example.yol_yolakay.core.network.model.RegisterPushTokenRequest
 import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.post
+import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
 
 class NotificationsRemoteRepository(private val userId: String) {
 
-    private fun io.ktor.client.request.HttpRequestBuilder.attachUser() {
+    suspend fun registerPushToken(token: String) {
+        val resp = BackendClient.client.post("api/notifications/token") {
+            header("x-user-id", userId)
+            contentType(ContentType.Application.Json)
+            setBody(RegisterPushTokenRequest(token))
+        }
+        if (!resp.status.isSuccess()) {
+            throw Exception("RegisterToken HTTP ${resp.status.value}: ${resp.bodyAsText()}")
+        }
+    }
+
+    private fun HttpRequestBuilder.attachUser() {
         header("x-user-id", userId)
     }
 

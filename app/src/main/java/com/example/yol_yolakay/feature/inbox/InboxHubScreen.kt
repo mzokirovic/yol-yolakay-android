@@ -4,11 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
-import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
 
 private enum class InboxTab { CHATS, UPDATES }
 
@@ -16,16 +13,20 @@ private enum class InboxTab { CHATS, UPDATES }
 fun InboxHubScreen(
     onOpenThread: (String) -> Unit,
     onOpenTrip: (String) -> Unit,
-    notifVm: NotificationsViewModel
+    notifVm: NotificationsViewModel,
+    openUpdatesSignal: Int = 0
 ) {
     var tab by rememberSaveable { mutableStateOf(InboxTab.CHATS) }
 
-    val ctx = LocalContext.current
+    // ✅ Notification orqali kelganda Updates tab’ni ochamiz
+    LaunchedEffect(openUpdatesSignal) {
+        if (openUpdatesSignal > 0) {
+            tab = InboxTab.UPDATES
+            notifVm.refresh()
+        }
+    }
 
-    // ✅ Bitta VM — badge ham, list ham shu VM’dan
-    val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
-
-    val unread = notifVm.state.items.count { !it.isRead }
+    val unread = notifVm.state.unreadCount
 
     Column {
         TabRow(selectedTabIndex = tab.ordinal) {
@@ -34,32 +35,26 @@ fun InboxHubScreen(
                 onClick = { tab = InboxTab.CHATS },
                 text = { Text("Chats") }
             )
-
             Tab(
                 selected = tab == InboxTab.UPDATES,
                 onClick = {
                     tab = InboxTab.UPDATES
-                    notifVm.refresh() // ✅ har kirganda yangilab olamiz
+                    notifVm.refresh()
                 },
                 text = {
                     if (unread > 0) {
-                        BadgedBox(badge = { Badge { Text(unread.toString()) } }) {
-                            Text("Updates")
-                        }
-                    } else {
-                        Text("Updates")
-                    }
+                        BadgedBox(badge = { Badge { Text(unread.toString()) } }) { Text("Updates") }
+                    } else Text("Updates")
                 }
             )
         }
 
         when (tab) {
             InboxTab.CHATS -> InboxScreen(onOpenThread = onOpenThread)
-
             InboxTab.UPDATES -> NotificationsScreen(
                 onOpenTrip = onOpenTrip,
                 onOpenThread = onOpenThread,
-                vm = notifVm // ✅ shu yerda pass qilamiz
+                vm = notifVm
             )
         }
     }

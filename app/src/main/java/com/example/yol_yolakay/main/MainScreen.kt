@@ -5,31 +5,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.navigation.toRoute
+import com.example.yol_yolakay.AppDeepLink
 import com.example.yol_yolakay.feature.inbox.InboxHubScreen
-import com.example.yol_yolakay.feature.inbox.InboxScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
-import com.example.yol_yolakay.feature.profile.LanguageScreen
-import com.example.yol_yolakay.feature.profile.PaymentMethodsScreen
-import com.example.yol_yolakay.feature.profile.ProfileEditScreen
-import com.example.yol_yolakay.feature.profile.ProfileScreen
-import com.example.yol_yolakay.feature.profile.VehicleScreen
+import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
+import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
+import com.example.yol_yolakay.feature.profile.*
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.search.SearchScreen
 import com.example.yol_yolakay.feature.search.TripListScreen
 import com.example.yol_yolakay.feature.tripdetails.TripDetailsScreen
 import com.example.yol_yolakay.feature.trips.MyTripsScreen
 import com.example.yol_yolakay.navigation.Screen
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
-import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
 
 data class BottomNavItem(
     val name: String,
@@ -38,12 +35,50 @@ data class BottomNavItem(
 )
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    deepLink: AppDeepLink? = null,
+    onDeepLinkHandled: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val ctx = LocalContext.current
 
     val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
     val unread = notifVm.state.unreadCount
+
+    // ✅ Updates tab ochish uchun signal
+    var openUpdatesSignal by rememberSaveable { mutableStateOf(0) }
+
+    // ✅ Snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // ✅ Notification bosilganda kerakli joyga olib kiradi + info ko‘rsatadi
+    LaunchedEffect(deepLink) {
+        val dl = deepLink ?: return@LaunchedEffect
+
+        // 1) title/body ko‘rsatish
+        val t = dl.title?.trim().orEmpty()
+        val b = dl.body?.trim().orEmpty()
+        if (t.isNotBlank() || b.isNotBlank()) {
+            val msg = if (t.isNotBlank() && b.isNotBlank()) "$t — $b" else (t.ifBlank { b })
+            snackbarHostState.showSnackbar(message = msg)
+        }
+
+        // 2) navigation
+        when {
+            !dl.threadId.isNullOrBlank() -> {
+                navController.navigate(Screen.Thread(dl.threadId)) { launchSingleTop = true }
+            }
+            !dl.tripId.isNullOrBlank() -> {
+                navController.navigate(Screen.TripDetails(dl.tripId)) { launchSingleTop = true }
+            }
+            else -> {
+                openUpdatesSignal++
+                navController.navigate(Screen.Inbox) { launchSingleTop = true }
+            }
+        }
+
+        onDeepLinkHandled()
+    }
 
     val bottomNavItems = listOf(
         BottomNavItem("Qidiruv", Screen.Search, Icons.Default.Search),
@@ -54,16 +89,15 @@ fun MainScreen() {
     )
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDest = navBackStackEntry?.destination
 
                 bottomNavItems.forEach { item ->
-
                     val isSelected = when (item.route) {
 
-                        // ✅ Profile tab selected bo‘lib turishi (sub-screenlarda ham)
                         Screen.Profile -> {
                             currentDest?.hierarchy?.any { dest ->
                                 dest.hasRoute(Screen.Profile::class) ||
@@ -74,7 +108,6 @@ fun MainScreen() {
                             } == true
                         }
 
-                        // ✅ Inbox tab selected bo‘lib turishi (Thread screen ichida ham)
                         Screen.Inbox -> {
                             currentDest?.hierarchy?.any { dest ->
                                 dest.hasRoute(Screen.Inbox::class) ||
@@ -82,20 +115,14 @@ fun MainScreen() {
                             } == true
                         }
 
-                        else -> {
-                            currentDest?.hierarchy?.any {
-                                it.hasRoute(item.route::class)
-                            } == true
-                        }
+                        else -> currentDest?.hierarchy?.any { it.hasRoute(item.route::class) } == true
                     }
 
                     NavigationBarItem(
                         selected = isSelected,
                         onClick = {
                             navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -123,11 +150,9 @@ fun MainScreen() {
         ) {
 
             composable<Screen.Search> {
-                SearchScreen(
-                    onSearchClick = { from: String, to: String, date: String, pass: Int ->
-                        navController.navigate(Screen.TripList(from, to, date, pass))
-                    }
-                )
+                SearchScreen { from, to, date, pass ->
+                    navController.navigate(Screen.TripList(from, to, date, pass))
+                }
             }
 
             composable<Screen.TripList> { backStackEntry ->
@@ -138,9 +163,7 @@ fun MainScreen() {
                     date = args.date,
                     passengers = args.passengers,
                     onBack = { navController.popBackStack() },
-                    onTripClick = { tripId ->
-                        navController.navigate(Screen.TripDetails(tripId))
-                    }
+                    onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
                 )
             }
 
@@ -149,16 +172,10 @@ fun MainScreen() {
                 TripDetailsScreen(
                     tripId = args.id,
                     onBack = { navController.popBackStack() },
-                    onOpenThread = { threadId ->
-                        navController.navigate(Screen.Thread(threadId))
-                    },
-                    onOpenInbox = {
-                        navController.navigate(Screen.Inbox)
-                    }
+                    onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
+                    onOpenInbox = { navController.navigate(Screen.Inbox) }
                 )
             }
-
-
 
             composable<Screen.Publish> {
                 PublishScreen(
@@ -173,59 +190,29 @@ fun MainScreen() {
             }
 
             composable<Screen.MyTrips> {
-                MyTripsScreen(
-                    onTripClick = { tripId ->
-                        navController.navigate(Screen.TripDetails(tripId))
-                    }
-                )
+                MyTripsScreen(onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) })
             }
 
             // ✅ Inbox hub (Chats + Updates)
             composable<Screen.Inbox> {
                 InboxHubScreen(
-                    onOpenThread = { threadId ->
-                        navController.navigate(Screen.Thread(threadId))
-                    },
-                    onOpenTrip = { tripId ->
-                        navController.navigate(Screen.TripDetails(tripId))
-                    },
-                    notifVm = notifVm
+                    onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
+                    onOpenTrip = { tripId -> navController.navigate(Screen.TripDetails(tripId)) },
+                    notifVm = notifVm,
+                    openUpdatesSignal = openUpdatesSignal
                 )
             }
 
-
-            // ✅ Chat screen
             composable<Screen.Thread> { backStackEntry ->
                 val args = backStackEntry.toRoute<Screen.Thread>()
-                ThreadScreen(
-                    threadId = args.id,
-                    onBack = { navController.popBackStack() }
-                )
+                ThreadScreen(threadId = args.id, onBack = { navController.popBackStack() })
             }
 
-            // ✅ Profile (tab)
-            composable<Screen.Profile> {
-                ProfileScreen(
-                    onNavigate = { route -> navController.navigate(route) }
-                )
-            }
-
-            // ✅ Profile sub-screens
-            composable<Screen.ProfileEdit> {
-                ProfileEditScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable<Screen.Vehicle> {
-                VehicleScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable<Screen.Language> {
-                LanguageScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable<Screen.PaymentMethods> {
-                PaymentMethodsScreen(onBack = { navController.popBackStack() })
-            }
+            composable<Screen.Profile> { ProfileScreen(onNavigate = { route -> navController.navigate(route) }) }
+            composable<Screen.ProfileEdit> { ProfileEditScreen(onBack = { navController.popBackStack() }) }
+            composable<Screen.Vehicle> { VehicleScreen(onBack = { navController.popBackStack() }) }
+            composable<Screen.Language> { LanguageScreen(onBack = { navController.popBackStack() }) }
+            composable<Screen.PaymentMethods> { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }
