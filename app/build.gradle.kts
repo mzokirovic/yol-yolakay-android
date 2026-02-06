@@ -45,6 +45,9 @@ android {
 
 dependencies {
 
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("io.ktor:ktor-client-auth:2.3.12")
+
     // ✅ Firebase BoM (versiyani bitta joydan boshqaradi)
     implementation(platform("com.google.firebase:firebase-bom:34.8.0"))
     // ✅ FCM (endi -ktx ishlatmaymiz)

@@ -18,7 +18,9 @@ sealed interface Screen {
         val passengers: Int
     ) : Screen
 
+    // Hozir Auth AppRoot orqali ishlayapti, ammo o'chirmaymiz (sinmasin)
     @Serializable data object Login : Screen
+
     @Serializable data class TripDetails(val id: String) : Screen
 
     // Profile sub screens
