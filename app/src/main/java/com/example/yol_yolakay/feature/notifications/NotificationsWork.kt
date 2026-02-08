@@ -19,7 +19,7 @@ object NotificationsWork {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.KEEP, // ✅ update emas, dubl bo'lmasin
             req
         )
     }

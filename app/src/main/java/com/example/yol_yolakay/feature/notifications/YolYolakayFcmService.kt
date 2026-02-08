@@ -16,16 +16,18 @@ class YolYolakayFcmService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Tokenni faqat user login qilgan bo'lsa yangilaymiz
-        val userId = CurrentUser.id(applicationContext)
-        if (userId.isNotEmpty()) {
-            serviceScope.launch {
-                try {
-                    NotificationsRemoteRepository(userId).registerPushToken(token)
-                } catch (e: Exception) {
-                    // Jimgina logga yozamiz, foydalanuvchiga bildirish shart emas
-                    Log.w("FCM", "Token yangilashda xatolik", e)
+
+        // ✅ har doim saqlab qo'yamiz
+        NotificationsStore.saveFcmToken(applicationContext, token)
+
+        serviceScope.launch {
+            try {
+                val session = com.example.yol_yolakay.core.session.SessionStore(applicationContext)
+                if (session.bearerTokensOrNull() != null) {
+                    NotificationsRemoteRepository().registerPushToken(token)
                 }
+            } catch (e: Exception) {
+                Log.w("FCM", "Token register xatolik", e)
             }
         }
     }
@@ -44,7 +46,14 @@ class YolYolakayFcmService : FirebaseMessagingService() {
                 threadId = data["thread_id"],
                 tripId = data["trip_id"]
             )
+
+            // ✅ DEDUPE: push kelganini eslab qolamiz
+            val nid = data["notification_id"]
+            if (!nid.isNullOrBlank()) {
+                NotificationsStore.rememberId(applicationContext, nid)
+            }
         }
+
         // 2. Fallback: Agar Firebase konsol orqali yuborilsa
         else {
             message.notification?.let {

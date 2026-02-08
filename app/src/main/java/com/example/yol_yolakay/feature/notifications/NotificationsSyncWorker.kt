@@ -11,10 +11,13 @@ class NotificationsSyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        return runCatching {
-            val uid = CurrentUser.id(applicationContext)
-            val repo = NotificationsRemoteRepository(uid)
+        val session = com.example.yol_yolakay.core.session.SessionStore(applicationContext)
+        if (session.bearerTokensOrNull() == null) {
+            return Result.success() // ✅ login yo'q -> network yo'q
+        }
 
+        return runCatching {
+            val repo = NotificationsRemoteRepository()
             val list = repo.list()
             val unread = list.filter { !it.isRead }
 

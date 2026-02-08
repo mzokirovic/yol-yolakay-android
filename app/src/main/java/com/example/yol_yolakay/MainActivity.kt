@@ -14,11 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,15 +22,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.di.AppGraph
 import com.example.yol_yolakay.core.network.BackendClient
 import com.example.yol_yolakay.core.session.SessionStore
-import com.example.yol_yolakay.feature.auth.AuthRemoteRepository
 import com.example.yol_yolakay.feature.auth.AuthScreen
-import com.example.yol_yolakay.feature.auth.AuthViewModel
-import com.example.yol_yolakay.feature.auth.AuthViewModelFactory
 import com.example.yol_yolakay.feature.notifications.NotificationsRemoteRepository
+import com.example.yol_yolakay.feature.notifications.NotificationsWork
 import com.example.yol_yolakay.feature.profile.CompleteProfileScreen
 import com.example.yol_yolakay.feature.profile.ProfileRemoteRepository
 import com.example.yol_yolakay.main.MainScreen
@@ -42,9 +35,8 @@ import com.example.yol_yolakay.ui.theme.YolYolakayTheme
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.tasks.await
 
-// DeepLink ma'lumotlari
 data class AppDeepLink(
     val notificationId: String? = null,
     val threadId: String? = null,
@@ -59,7 +51,6 @@ class MainActivity : ComponentActivity() {
     private val deepLinkState = mutableStateOf<AppDeepLink?>(null)
     private lateinit var sessionStore: SessionStore
 
-    // Ruxsat so'rash (Android 13+)
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) syncFcmTokenIfLoggedIn()
@@ -69,18 +60,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 1. Tizimni ishga tushirish
+        // ✅ AppGraph init Application’da ham bor, lekin idempotent bo'lsa bu ham xavfsiz.
         AppGraph.init(this)
         sessionStore = AppGraph.sessionStore(this)
+        BackendClient.init(this, sessionStore)
 
-        // 2. Notification Kanalini yaratish (Muhim: Push kechikmasligi uchun)
         createNotificationChannel()
 
-        // 3. Deep linkni ushlab olish
         deepLinkState.value = parseIntent(intent)
         markReadBestEffort(deepLinkState.value?.notificationId)
 
-        // 4. Ekranni chizish
         setContent {
             YolYolakayTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
@@ -93,9 +82,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 5. Ruxsat va Token ishlari
         requestPostNotificationsIfNeeded()
-        syncFcmTokenIfLoggedIn()
+        // ❌ bu yerda token sync majbur emas (login bo'lganda AppRoot qiladi)
+        // syncFcmTokenIfLoggedIn()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -137,27 +126,27 @@ class MainActivity : ComponentActivity() {
     private fun markReadBestEffort(notificationId: String?) {
         if (notificationId.isNullOrBlank()) return
         lifecycleScope.launch(Dispatchers.IO) {
-            val uid = sessionStore.userIdOrNull() ?: return@launch
-            runCatching { NotificationsRemoteRepository(uid).markRead(notificationId) }
+            runCatching { NotificationsRemoteRepository().markRead(notificationId) }
         }
     }
 
     private fun requestPostNotificationsIfNeeded() {
         if (Build.VERSION.SDK_INT < 33) return
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
         if (!granted) notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     private fun syncFcmTokenIfLoggedIn() {
         lifecycleScope.launch(Dispatchers.IO) {
+            // userId bo'lmasa login emas
             val uid = sessionStore.userIdOrNull() ?: return@launch
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val token = task.result
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        runCatching { NotificationsRemoteRepository(uid).registerPushToken(token) }
-                    }
-                }
+            runCatching {
+                val token = FirebaseMessaging.getInstance().token.await()
+                NotificationsRemoteRepository().registerPushToken(token)
+                Log.d("FCM", "Token synced (permission flow) uid=$uid")
             }
         }
     }
@@ -170,109 +159,103 @@ private fun AppRoot(
     onDeepLinkHandled: () -> Unit
 ) {
     val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
-    val context = LocalContext.current
+    var authCompleted by remember { mutableStateOf(false) }
+    var profileState by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
 
-    // ✅ SENIOR FIX: Login bo'lgan zahoti tokenni yangilash
-    // Bu oldingi "Login qildim, lekin push kelmadi" muammosini 100% yechadi.
+    val ctx = LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
+
+    // ✅ login bo'lsa: worker + token sync
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
-            val uid = sessionStore.userIdOrNull()
-            if (!uid.isNullOrBlank()) {
-                FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val token = task.result
-                        // UI o'lib qolsa ham ishlashi uchun GlobalScope ishlatamiz (xavfsiz)
-                        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-                            runCatching {
-                                NotificationsRemoteRepository(uid).registerPushToken(token)
-                                Log.d("FCM", "Token synced on login: $token")
-                            }
-                        }
-                    }
-                }
+            NotificationsWork.start(ctx)
+            runCatching {
+                val token = FirebaseMessaging.getInstance().token.await()
+                NotificationsRemoteRepository().registerPushToken(token)
+                Log.d("FCM", "Token synced on login")
             }
+        } else {
+            NotificationsWork.stop(ctx)
         }
     }
 
-    if (!isLoggedIn) {
-        val repo = remember { AuthRemoteRepository(BackendClient.client) }
-        val vm: AuthViewModel = viewModel(factory = AuthViewModelFactory(repo, sessionStore))
-        AuthScreen(
-            vm = vm,
-            onNavigateToHome = { },
-            onNavigateToCompleteProfile = { }
-        )
-    } else {
-        val profileRepo = remember { ProfileRemoteRepository() }
-
-        // Uchta holat: Yuklanmoqda | Xatolik | Profil Kerak | Tayyor
-        var isLoading by remember { mutableStateOf(true) }
-        var isError by remember { mutableStateOf(false) } // ✅ Yangi state (Internet yo'qligi uchun)
-        var needsProfile by remember { mutableStateOf(false) }
-
-        // Profilni tekshirish funksiyasi
-        fun checkProfile() {
-            isLoading = true
-            isError = false
-            // Main Dispatcherda ishga tushamiz, lekin so'rovni IO da bajaramiz
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
-                runCatching {
-                    withContext(Dispatchers.IO) { profileRepo.getMe() }
-                }
-                    .onSuccess { p ->
-                        // ✅ Space (Probel) muammosini shu yerda trim() orqali hal qilamiz
-                        val name = p.displayName?.trim() ?: ""
-
-                        // Agar ism bo'sh bo'lsa -> Demak yangi yoki to'ldirilmagan -> Profil oynasiga
-                        // Agar ism bor bo'lsa -> Main Screen ga
-                        needsProfile = name.isBlank() || name.equals("Guest", ignoreCase = true)
-                        isLoading = false
-                    }
-                    .onFailure {
-                        // ✅ ENG MUHIM JOY: Xato bo'lsa, adashib Registratsiyaga o'tib ketmaymiz!
-                        // Foydalanuvchiga "Qayta urinish" tugmasini beramiz.
-                        Log.e("AppRoot", "Profile check failed", it)
-                        isError = true
-                        isLoading = false
-                    }
+    // Profilni tekshirish
+    LaunchedEffect(isLoggedIn, authCompleted) {
+        if (isLoggedIn || authCompleted) {
+            profileState = ProfileState.Loading
+            runCatching {
+                val p = ProfileRemoteRepository().getMe()
+                val name = p.displayName?.trim() ?: ""
+                val needs = name.isBlank() || name.equals("Guest", ignoreCase = true)
+                profileState = if (needs) ProfileState.NeedsCompletion else ProfileState.Complete
+            }.onFailure {
+                Log.e("AppRoot", "Profile check failed", it)
+                profileState = ProfileState.Error
             }
-        }
-
-        // Ilova ochilganda bir marta tekshirsin
-        LaunchedEffect(Unit) {
-            checkProfile()
-        }
-
-        when {
-            isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            isError -> {
-                // ✅ Internet uzilganda chiqadigan oyna
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Internet bilan aloqa yo'q", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.height(16.dp))
-                        Button(onClick = { checkProfile() }) {
-                            Text("Qayta urinish")
-                        }
-                    }
-                }
-            }
-            needsProfile -> {
-                CompleteProfileScreen(
-                    repo = profileRepo,
-                    onDone = { needsProfile = false }
-                )
-            }
-            else -> {
-                MainScreen(
-                    deepLink = deepLink,
-                    onDeepLinkHandled = onDeepLinkHandled
-                )
-            }
+        } else {
+            profileState = ProfileState.LoggedOut
         }
     }
+
+    // Deep link handled (UI-level), MainScreen o'zi navigate qiladi
+    LaunchedEffect(deepLink) {
+        // bu yerda hech narsa shart emas, MainScreen ishlatadi
+        // (qolsa ham zarar qilmaydi)
+    }
+
+    when (profileState) {
+        ProfileState.LoggedOut -> {
+            AuthScreen(
+                onNavigateToHome = { authCompleted = true },
+                onNavigateToCompleteProfile = { authCompleted = true }
+            )
+        }
+
+        ProfileState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+
+        ProfileState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Internet bilan aloqa yo'q", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { authCompleted = !authCompleted }) {
+                        Text("Qayta urinish")
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    TextButton(onClick = {
+                        // ✅ GlobalScope emas
+                        scope.launch { sessionStore.clear() }
+                    }) {
+                        Text("Chiqish")
+                    }
+                }
+            }
+        }
+
+        ProfileState.NeedsCompletion -> {
+            CompleteProfileScreen(
+                repo = remember { ProfileRemoteRepository() },
+                onDone = { profileState = ProfileState.Complete }
+            )
+        }
+
+        ProfileState.Complete -> {
+            MainScreen(
+                deepLink = deepLink,
+                onDeepLinkHandled = onDeepLinkHandled
+            )
+        }
+    }
+}
+
+enum class ProfileState {
+    LoggedOut,
+    Loading,
+    Error,
+    NeedsCompletion,
+    Complete
 }

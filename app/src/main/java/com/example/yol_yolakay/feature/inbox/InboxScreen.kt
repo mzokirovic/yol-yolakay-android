@@ -52,8 +52,8 @@ class InboxViewModel(private val repo: InboxRemoteRepository) : ViewModel() {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val uid = CurrentUser.id(context)
-                    return InboxViewModel(InboxRemoteRepository(uid)) as T
+                    // 🚨 Argument olib tashlandi
+                    return InboxViewModel(InboxRemoteRepository()) as T
                 }
             }
     }

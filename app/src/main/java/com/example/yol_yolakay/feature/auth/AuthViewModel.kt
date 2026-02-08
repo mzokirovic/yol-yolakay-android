@@ -1,16 +1,20 @@
+// /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/feature/auth/AuthViewModel.kt
+
 package com.example.yol_yolakay.feature.auth
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.session.SessionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// Yangi step qo'shildi: PROFILE_MISSING
 enum class AuthStep { PHONE, CODE }
 
-// Navigatsiya uchun Eventlar (Single Live Event o'rniga oddiyroq yechim)
+// Navigatsiya
 sealed class AuthEvent {
     object NavigateToHome : AuthEvent()
     object NavigateToCompleteProfile : AuthEvent()
@@ -18,12 +22,12 @@ sealed class AuthEvent {
 }
 
 data class AuthState(
-    val phone: String = "",
+    val phone: String = "+998", // Default prefix
     val code: String = "",
     val step: AuthStep = AuthStep.PHONE,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val event: AuthEvent = AuthEvent.None // <-- Navigatsiya boshqaruvi
+    val event: AuthEvent = AuthEvent.None
 )
 
 class AuthViewModel(
@@ -34,26 +38,53 @@ class AuthViewModel(
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state
 
-    fun setPhone(v: String) { _state.value = _state.value.copy(phone = v, error = null) }
-    fun setCode(v: String) { _state.value = _state.value.copy(code = v, error = null) }
+    fun setPhone(v: String) {
+        _state.update { it.copy(phone = v, error = null) }
+    }
 
-    // Eventni "iste'mol" qilingandan keyin o'chirish uchun
-    fun consumeEvent() { _state.value = _state.value.copy(event = AuthEvent.None) }
+    fun setCode(v: String) {
+        _state.update { it.copy(code = v, error = null) }
+    }
+
+    fun consumeEvent() {
+        _state.update { it.copy(event = AuthEvent.None) }
+    }
+
+    // Yordamchi: Raqamni tozalash
+    private fun formatPhone(raw: String): String {
+        // Faqat raqamlarni qoldiramiz
+        val digits = raw.filter { it.isDigit() }
+        // Agar 998 bilan boshlanmasa, qo'shib qo'yamiz (o'zbekiston uchun)
+        return if (digits.startsWith("998")) "+$digits" else "+998$digits"
+    }
 
     fun sendOtp() {
         viewModelScope.launch {
             val s = _state.value
-            val p = s.phone.trim()
-            if (p.isBlank()) { _state.value = s.copy(error = "Telefon raqam kiriting"); return@launch }
 
-            _state.value = s.copy(isLoading = true, error = null)
-            runCatching { repo.sendOtp(p) }
+            // Formatlash
+            val cleanPhone = s.phone.replace(" ", "").replace("-", "")
+
+            if (cleanPhone.length < 9) { // Juda qisqa bo'lsa
+                _state.update { it.copy(error = "Telefon raqam noto'g'ri") }
+                return@launch
+            }
+
+            // Supabasega ketadigan format (+998...)
+            val finalPhone = if (cleanPhone.startsWith("+")) cleanPhone else "+$cleanPhone"
+
+            _state.update { it.copy(isLoading = true, error = null) }
+
+            runCatching { repo.sendOtp(finalPhone) }
                 .onSuccess {
-                    // Muvaffaqiyatli bo'lsa kod kiritishga o'tamiz
-                    _state.value = _state.value.copy(isLoading = false, step = AuthStep.CODE)
+                    _state.update { it.copy(isLoading = false, step = AuthStep.CODE, error = null) }
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Xatolik")
+                    // 422 xatosi bo'lsa chiroyli ko'rsatamiz
+                    val msg = if (e.message?.contains("422") == true)
+                        "Raqam formati noto'g'ri yoki SMS limiti tugagan"
+                    else e.message ?: "Xatolik yuz berdi"
+                    _state.update { it.copy(isLoading = false, error = msg) }
                 }
         }
     }
@@ -61,39 +92,45 @@ class AuthViewModel(
     fun verifyOtp() {
         viewModelScope.launch {
             val s = _state.value
-            val p = s.phone.trim()
-            val c = s.code.trim()
-            if (c.isBlank()) { _state.value = s.copy(error = "SMS kodni kiriting"); return@launch }
+            val cleanPhone = s.phone.replace(" ", "").replace("-", "")
+            val finalPhone = if (cleanPhone.startsWith("+")) cleanPhone else "+$cleanPhone"
+            val code = s.code.trim()
 
-            _state.value = s.copy(isLoading = true, error = null)
-            runCatching { repo.verifyOtp(p, c) }
+            if (code.length < 6) {
+                _state.update { it.copy(error = "Kod 6 xonali bo'lishi kerak") }
+                return@launch
+            }
+
+            _state.update { it.copy(isLoading = true, error = null) }
+
+            runCatching { repo.verifyOtp(finalPhone, code) }
                 .onSuccess { res ->
-                    val token = res.accessToken
-                    val uid = res.userId
-
-                    if (!token.isNullOrBlank() && !uid.isNullOrBlank()) {
-                        // 1. Tokenni saqlaymiz
-                        sessionStore.save(token, res.refreshToken, uid)
-
-                        // 2. Logic: User yangimi yoki eskami?
-                        if (res.isNewUser) {
-                            // Agar yangi bo'lsa -> Profil to'ldirishga
-                            _state.value = _state.value.copy(isLoading = false, event = AuthEvent.NavigateToCompleteProfile)
-                        } else {
-                            // Agar eski bo'lsa -> To'g'ridan-to'g'ri Homega
-                            _state.value = _state.value.copy(isLoading = false, event = AuthEvent.NavigateToHome)
-                        }
+                    if (res.token != null && res.userId != null) {
+                        sessionStore.save(res.token, res.refreshToken, res.userId)
+                        // Yangi user bo'lsa profilga, bo'lmasa uyga
+                        val event = if (res.isNewUser) AuthEvent.NavigateToCompleteProfile else AuthEvent.NavigateToHome
+                        _state.update { it.copy(isLoading = false, event = event) }
                     } else {
-                        _state.value = _state.value.copy(isLoading = false, error = res.message ?: "Token kelmadi")
+                        _state.update { it.copy(isLoading = false, error = "Serverdan token kelmadi") }
                     }
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Xatolik")
+                    _state.update { it.copy(isLoading = false, error = "Kod noto'g'ri yoki eskirgan") }
                 }
         }
     }
 
     fun backToPhone() {
-        _state.value = _state.value.copy(step = AuthStep.PHONE, code = "", error = null)
+        _state.update { it.copy(step = AuthStep.PHONE, code = "", error = null) }
+    }
+
+    companion object {
+        // Factory kerak bo'ladi (chunki repo va sessionStore bor)
+        fun factory(context: Context, repo: AuthRemoteRepository, session: SessionStore): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return AuthViewModel(repo, session) as T
+            }
+        }
     }
 }

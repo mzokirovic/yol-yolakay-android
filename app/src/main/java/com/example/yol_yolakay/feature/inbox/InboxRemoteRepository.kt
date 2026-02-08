@@ -5,7 +5,6 @@ import com.example.yol_yolakay.core.network.model.MessageApiModel
 import com.example.yol_yolakay.core.network.model.ThreadApiModel
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -14,11 +13,9 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
 
-class InboxRemoteRepository(private val userId: String) {
+class InboxRemoteRepository { // 🚨 Argument olib tashlandi
 
-    private fun io.ktor.client.request.HttpRequestBuilder.attachUser() {
-        header("x-user-id", userId)
-    }
+    // 🚨 attachUser() funksiyasi kerak emas, BackendClient o'zi hal qiladi
 
     @Serializable
     private data class ThreadsResponse(
@@ -48,7 +45,7 @@ class InboxRemoteRepository(private val userId: String) {
     private data class SendMessageRequest(val text: String)
 
     suspend fun listThreads(): List<ThreadApiModel> {
-        val resp = BackendClient.client.get("api/inbox") { attachUser() }
+        val resp = BackendClient.client.get("api/inbox")
         if (!resp.status.isSuccess()) {
             throw Exception("Inbox HTTP ${resp.status.value}: ${resp.bodyAsText()}")
         }
@@ -56,7 +53,7 @@ class InboxRemoteRepository(private val userId: String) {
     }
 
     suspend fun getMessages(threadId: String): List<MessageApiModel> {
-        val resp = BackendClient.client.get("api/inbox/threads/$threadId") { attachUser() }
+        val resp = BackendClient.client.get("api/inbox/threads/$threadId")
         if (!resp.status.isSuccess()) {
             throw Exception("Messages HTTP ${resp.status.value}: ${resp.bodyAsText()}")
         }
@@ -65,7 +62,6 @@ class InboxRemoteRepository(private val userId: String) {
 
     suspend fun sendMessage(threadId: String, text: String) {
         val resp = BackendClient.client.post("api/inbox/threads/$threadId/messages") {
-            attachUser()
             contentType(ContentType.Application.Json)
             setBody(SendMessageRequest(text))
         }
@@ -76,7 +72,6 @@ class InboxRemoteRepository(private val userId: String) {
 
     suspend fun createThread(peerId: String, tripId: String? = null): String? {
         val resp = BackendClient.client.post("api/inbox/threads") {
-            attachUser()
             contentType(ContentType.Application.Json)
             setBody(CreateThreadRequest(peerId, tripId))
         }

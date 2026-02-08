@@ -25,12 +25,13 @@ fun PublishScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // ✅ Seam ulash: 1 marta set qilib qo‘yamiz
+    // User ID ni olish
     val ctx = LocalContext.current
     LaunchedEffect(ctx) {
         viewModel.setCurrentUser(CurrentUser.id(ctx))
     }
 
+    // E'lon yaratilgandan keyingi holat
     LaunchedEffect(uiState.isPublished) {
         if (uiState.isPublished) {
             delay(1200)
@@ -39,12 +40,15 @@ fun PublishScreen(
         }
     }
 
+    // Progress bar animatsiyasi
+    val currentProgress = (uiState.currentStep.ordinal + 1) / 7f
     val animatedProgress by animateFloatAsState(
-        targetValue = uiState.progress,
+        targetValue = currentProgress,
         animationSpec = tween(durationMillis = 500),
         label = "ProgressBarAnimation"
     )
 
+    // Back tugmasini ushlash
     BackHandler(enabled = uiState.currentStep != PublishStep.FROM) {
         viewModel.onBack()
     }
@@ -77,6 +81,7 @@ fun PublishScreen(
 
             Button(
                 onClick = { viewModel.onNext() },
+                // ✅ TUZATILDI: isNextEnabled ViewModelda to'g'ri sozlangan
                 enabled = uiState.isNextEnabled && !uiState.isPublishing && !uiState.isPublished,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -86,7 +91,8 @@ fun PublishScreen(
                 if (uiState.isPublishing) {
                     CircularProgressIndicator(
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(12.dp))
                     Text("Yuborilyapti...")
@@ -114,8 +120,9 @@ fun PublishScreen(
             if (uiState.isPublished) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "✅ E'lon yaratildi!",
-                    color = MaterialTheme.colorScheme.primary
+                    text = "✅ E'lon muvaffaqiyatli yaratildi!",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
 
@@ -124,7 +131,6 @@ fun PublishScreen(
                 label = "WizardTransition",
                 transitionSpec = {
                     val isMovingForward = targetState.ordinal > initialState.ordinal
-
                     if (isMovingForward) {
                         slideInHorizontally { width -> width } + fadeIn() togetherWith
                                 slideOutHorizontally { width -> -width } + fadeOut()
@@ -135,12 +141,33 @@ fun PublishScreen(
                 }
             ) { step ->
                 when (step) {
-                    PublishStep.FROM -> Step1From(uiState.fromLocation, viewModel::onFromChange)
-                    PublishStep.TO -> Step2To(uiState.toLocation, viewModel::onToChange)
-                    PublishStep.DATE -> Step3Date(uiState.date, viewModel::onDateChange)
-                    PublishStep.TIME -> Step4Time(uiState.time, viewModel::onTimeChange)
-                    PublishStep.PASSENGERS -> Step5Passengers(uiState.passengers, viewModel::onPassengersChange)
-                    PublishStep.PRICE -> Step6Price(uiState.price, viewModel::onPriceChange)
+                    // ✅ 1. Draft ichidan ma'lumot olinmoqda
+                    PublishStep.FROM -> Step1From(
+                        currentLocation = uiState.draft.fromLocation,
+                        onLocationSelected = viewModel::onFromSelected,
+                        suggestions = uiState.popularPoints
+                    )
+                    // ✅ 2. Draft ichidan ma'lumot olinmoqda
+                    PublishStep.TO -> Step2To(
+                        currentLocation = uiState.draft.toLocation,
+                        onLocationSelected = viewModel::onToSelected,
+                        suggestions = uiState.popularPoints
+                    )
+                    // ✅ 3. Draft
+                    PublishStep.DATE -> Step3Date(uiState.draft.date, viewModel::onDateChange)
+                    // ✅ 4. Draft
+                    PublishStep.TIME -> Step4Time(uiState.draft.time, viewModel::onTimeChange)
+                    // ✅ 5. Draft
+                    PublishStep.PASSENGERS -> Step5Passengers(uiState.draft.passengers, viewModel::onPassengersChange)
+
+                    // ✅ 6. State to'liq uzatilyapti (u ichida draftni ham, suggestionni ham oladi)
+                    PublishStep.PRICE -> Step6Price(
+                        uiState = uiState,
+                        onPriceChange = viewModel::onPriceChange,
+                        onAdjustPrice = viewModel::adjustPrice
+                    )
+
+                    // ✅ 7. State to'liq uzatilyapti
                     PublishStep.PREVIEW -> Step7Preview(uiState)
                 }
             }

@@ -1,3 +1,5 @@
+// /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/feature/profile/ProfileViewModel.kt
+
 package com.example.yol_yolakay.feature.profile
 
 import android.content.Context
@@ -7,7 +9,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.yol_yolakay.core.session.CurrentUser
 import kotlinx.coroutines.launch
 
 class ProfileViewModel(private val repo: ProfileRemoteRepository) : ViewModel() {
@@ -27,17 +28,16 @@ class ProfileViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
             }.onSuccess { (me, vehicle) ->
                 state = state.copy(isLoading = false, profile = me, vehicle = vehicle)
             }.onFailure { e ->
+                // Agar 401 (Unauthorized) bo'lsa, foydalanuvchini loginga otish kerak bo'lishi mumkin.
+                // Lekin hozircha xato ko'rsatamiz.
                 state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
             }
         }
     }
 
-
     fun showSoon(featureName: String) {
         state = state.copy(message = "$featureName: tez orada 🙂")
     }
-
-
 
     fun consumeMessage() { state = state.copy(message = null) }
 
@@ -46,8 +46,8 @@ class ProfileViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val userId = CurrentUser.id(context)
-                    return ProfileViewModel(ProfileRemoteRepository(userId)) as T
+                    // 🚨 O'ZGARISH: Argument yo'q. Toza kod.
+                    return ProfileViewModel(ProfileRemoteRepository()) as T
                 }
             }
     }

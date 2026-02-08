@@ -71,7 +71,8 @@ class ThreadViewModel(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val uid = CurrentUser.id(context)
-                    return ThreadViewModel(uid, InboxRemoteRepository(uid), threadId) as T
+                    // 🚨 InboxRemoteRepository() argumentsiz chaqiriladi
+                    return ThreadViewModel(uid, InboxRemoteRepository(), threadId) as T
                 }
             }
     }

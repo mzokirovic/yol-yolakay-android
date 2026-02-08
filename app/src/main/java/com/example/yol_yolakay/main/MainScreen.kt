@@ -16,6 +16,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.navigation.toRoute
 import com.example.yol_yolakay.AppDeepLink
+import com.example.yol_yolakay.core.session.SessionStore
 import com.example.yol_yolakay.feature.inbox.InboxHubScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
@@ -42,20 +43,29 @@ fun MainScreen(
     val navController = rememberNavController()
     val ctx = LocalContext.current
 
+    // ✅ 1) Notifications VM (MainScreen oldin ham shunday ishlagan)
     val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
-    val unread = notifVm.state.unreadCount
 
-    // ✅ Updates tab ochish uchun signal
-    var openUpdatesSignal by rememberSaveable { mutableStateOf(0) }
+    // ✅ 2) Login state ni notifVm'ga uzatamiz (real-app behavior)
+    val sessionStore = remember { SessionStore(ctx.applicationContext) }
+    val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
+    LaunchedEffect(isLoggedIn) {
+        notifVm.onLoginState(isLoggedIn)
+    }
 
-    // ✅ Snackbar
+    // ✅ unreadCount (compose reactive bo'ladi, notifVm.state mutableState)
+    val unreadCount = notifVm.state.unreadCount
+
+    // Updates tab ochish uchun signal
+    var openUpdatesSignal by rememberSaveable { mutableIntStateOf(0) }
+
+    // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // ✅ Notification bosilganda kerakli joyga olib kiradi + info ko‘rsatadi
+    // Notification bosilganda navigation
     LaunchedEffect(deepLink) {
         val dl = deepLink ?: return@LaunchedEffect
 
-        // 1) title/body ko‘rsatish
         val t = dl.title?.trim().orEmpty()
         val b = dl.body?.trim().orEmpty()
         if (t.isNotBlank() || b.isNotBlank()) {
@@ -63,7 +73,6 @@ fun MainScreen(
             snackbarHostState.showSnackbar(message = msg)
         }
 
-        // 2) navigation
         when {
             !dl.threadId.isNullOrBlank() -> {
                 navController.navigate(Screen.Thread(dl.threadId)) { launchSingleTop = true }
@@ -76,7 +85,6 @@ fun MainScreen(
                 navController.navigate(Screen.Inbox) { launchSingleTop = true }
             }
         }
-
         onDeepLinkHandled()
     }
 
@@ -97,7 +105,6 @@ fun MainScreen(
 
                 bottomNavItems.forEach { item ->
                     val isSelected = when (item.route) {
-
                         Screen.Profile -> {
                             currentDest?.hierarchy?.any { dest ->
                                 dest.hasRoute(Screen.Profile::class) ||
@@ -107,14 +114,12 @@ fun MainScreen(
                                         dest.hasRoute(Screen.PaymentMethods::class)
                             } == true
                         }
-
                         Screen.Inbox -> {
                             currentDest?.hierarchy?.any { dest ->
                                 dest.hasRoute(Screen.Inbox::class) ||
                                         dest.hasRoute(Screen.Thread::class)
                             } == true
                         }
-
                         else -> currentDest?.hierarchy?.any { it.hasRoute(item.route::class) } == true
                     }
 
@@ -122,15 +127,17 @@ fun MainScreen(
                         selected = isSelected,
                         onClick = {
                             navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
                                 launchSingleTop = true
                                 restoreState = true
                             }
                         },
                         label = { Text(item.name) },
                         icon = {
-                            if (item.route == Screen.Inbox && unread > 0) {
-                                BadgedBox(badge = { Badge { Text(unread.toString()) } }) {
+                            if (item.route == Screen.Inbox && unreadCount > 0) {
+                                BadgedBox(badge = { Badge { Text(unreadCount.toString()) } }) {
                                     Icon(item.icon, contentDescription = item.name)
                                 }
                             } else {
@@ -150,9 +157,11 @@ fun MainScreen(
         ) {
 
             composable<Screen.Search> {
-                SearchScreen { from, to, date, pass ->
-                    navController.navigate(Screen.TripList(from, to, date, pass))
-                }
+                SearchScreen(
+                    onSearchClick = { from, to, date, pass ->
+                        navController.navigate(Screen.TripList(from, to, date, pass))
+                    }
+                )
             }
 
             composable<Screen.TripList> { backStackEntry ->
@@ -181,19 +190,19 @@ fun MainScreen(
                 PublishScreen(
                     onPublished = {
                         navController.navigate(Screen.MyTrips) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            popUpTo(Screen.Search) { inclusive = false }
                             launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 )
             }
 
             composable<Screen.MyTrips> {
-                MyTripsScreen(onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) })
+                MyTripsScreen(
+                    onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
+                )
             }
 
-            // ✅ Inbox hub (Chats + Updates)
             composable<Screen.Inbox> {
                 InboxHubScreen(
                     onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
@@ -205,10 +214,15 @@ fun MainScreen(
 
             composable<Screen.Thread> { backStackEntry ->
                 val args = backStackEntry.toRoute<Screen.Thread>()
-                ThreadScreen(threadId = args.id, onBack = { navController.popBackStack() })
+                ThreadScreen(
+                    threadId = args.id,
+                    onBack = { navController.popBackStack() }
+                )
             }
 
-            composable<Screen.Profile> { ProfileScreen(onNavigate = { route -> navController.navigate(route) }) }
+            composable<Screen.Profile> {
+                ProfileScreen(onNavigate = { route -> navController.navigate(route) })
+            }
             composable<Screen.ProfileEdit> { ProfileEditScreen(onBack = { navController.popBackStack() }) }
             composable<Screen.Vehicle> { VehicleScreen(onBack = { navController.popBackStack() }) }
             composable<Screen.Language> { LanguageScreen(onBack = { navController.popBackStack() }) }

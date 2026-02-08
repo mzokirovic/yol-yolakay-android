@@ -77,8 +77,8 @@ class EditProfileViewModel(private val repo: ProfileRemoteRepository) : ViewMode
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val userId = CurrentUser.id(context)
-                    return EditProfileViewModel(ProfileRemoteRepository(userId)) as T
+                    // 🚨 Argument olib tashlandi
+                    return EditProfileViewModel(ProfileRemoteRepository()) as T
                 }
             }
     }

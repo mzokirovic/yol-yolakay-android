@@ -1,24 +1,34 @@
 package com.example.yol_yolakay.feature.publish.steps
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.yol_yolakay.feature.publish.LocationModel
+import com.example.yol_yolakay.feature.publish.components.LocationSelector
 
 @Composable
 fun Step2To(
-    value: String,
-    onValueChange: (String) -> Unit
+    currentLocation: LocationModel?,
+    onLocationSelected: (LocationModel) -> Unit,
+    suggestions: List<LocationModel>
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Qayerga borasiz?", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = "Qayerga borasiz?",
+            style = MaterialTheme.typography.headlineMedium
+        )
         Spacer(modifier = Modifier.height(24.dp))
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            label = { Text("Manzil") },
-            modifier = Modifier.fillMaxWidth()
+
+        // Biz yaratgan universal komponent
+        LocationSelector(
+            label = "Manzil",
+            placeholder = "Masalan: Samarqand, Registon...",
+            currentLocation = currentLocation,
+            onLocationSelected = onLocationSelected,
+            suggestions = suggestions
         )
     }
 }

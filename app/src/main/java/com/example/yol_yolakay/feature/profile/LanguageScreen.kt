@@ -79,8 +79,8 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val userId = CurrentUser.id(context)
-                    return LanguageViewModel(ProfileRemoteRepository(userId)) as T
+                    // 🚨 Argument olib tashlandi
+                    return LanguageViewModel(ProfileRemoteRepository()) as T
                 }
             }
     }

@@ -37,4 +37,19 @@ object NotificationsStore {
 
     fun getFcmToken(ctx: Context): String? =
         prefs(ctx).getString(KEY_FCM, null)
+
+
+    fun rememberId(ctx: Context, id: String) {
+        if (id.isBlank()) return
+        val p = prefs(ctx)
+        val current = (p.getStringSet(KEY_IDS, emptySet()) ?: emptySet()).toMutableSet()
+        current.add(id)
+
+        val list = current.toList()
+        val trimmed =
+            if (list.size <= MAX) list
+            else list.drop(list.size - MAX)
+
+        p.edit().putStringSet(KEY_IDS, trimmed.toSet()).apply()
+    }
 }

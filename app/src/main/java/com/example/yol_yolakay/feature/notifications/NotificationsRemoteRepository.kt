@@ -11,21 +11,16 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
 
-class NotificationsRemoteRepository(private val userId: String) {
+class NotificationsRemoteRepository { // 🚨 Argument olib tashlandi
 
     suspend fun registerPushToken(token: String) {
         val resp = BackendClient.client.post("api/notifications/token") {
-            header("x-user-id", userId)
             contentType(ContentType.Application.Json)
             setBody(RegisterPushTokenRequest(token))
         }
         if (!resp.status.isSuccess()) {
             throw Exception("RegisterToken HTTP ${resp.status.value}: ${resp.bodyAsText()}")
         }
-    }
-
-    private fun HttpRequestBuilder.attachUser() {
-        header("x-user-id", userId)
     }
 
     @Serializable
@@ -41,19 +36,19 @@ class NotificationsRemoteRepository(private val userId: String) {
     )
 
     suspend fun list(limit: Int = 50): List<NotificationApiModel> {
-        val resp = BackendClient.client.get("api/notifications?limit=$limit") { attachUser() }
+        val resp = BackendClient.client.get("api/notifications?limit=$limit")
         if (!resp.status.isSuccess()) throw Exception("Notifications HTTP ${resp.status.value}: ${resp.bodyAsText()}")
         return resp.body<ListResponse>().data
     }
 
     suspend fun markRead(id: String): NotificationApiModel? {
-        val resp = BackendClient.client.post("api/notifications/$id/read") { attachUser() }
+        val resp = BackendClient.client.post("api/notifications/$id/read")
         if (!resp.status.isSuccess()) throw Exception("MarkRead HTTP ${resp.status.value}: ${resp.bodyAsText()}")
         return resp.body<MarkReadResponse>().data
     }
 
     suspend fun markAllRead() {
-        val resp = BackendClient.client.post("api/notifications/read-all") { attachUser() }
+        val resp = BackendClient.client.post("api/notifications/read-all")
         if (!resp.status.isSuccess()) throw Exception("MarkAllRead HTTP ${resp.status.value}: ${resp.bodyAsText()}")
     }
 }

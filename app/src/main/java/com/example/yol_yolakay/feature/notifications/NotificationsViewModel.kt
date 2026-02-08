@@ -1,18 +1,16 @@
 package com.example.yol_yolakay.feature.notifications
 
-import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.yol_yolakay.core.session.CurrentUser
 import com.example.yol_yolakay.core.network.model.NotificationApiModel
 import kotlinx.coroutines.launch
 
 data class NotificationsState(
-    val isLoading: Boolean = true,
+    val isLoggedIn: Boolean = false,
+    val isLoading: Boolean = false,
     val items: List<NotificationApiModel> = emptyList(),
     val error: String? = null
 ) {
@@ -26,18 +24,47 @@ class NotificationsViewModel(
     var state by mutableStateOf(NotificationsState())
         private set
 
-    init { refresh() }
+    /**
+     * Screen ochilganda / login state o'zgarganda chaqiriladi.
+     * Login bo'lmasa - network yo'q.
+     */
+    fun onLoginState(isLoggedIn: Boolean) {
+        val prev = state.isLoggedIn
+        state = state.copy(isLoggedIn = isLoggedIn, error = null)
+
+        // login bo'lganda bir marta auto-refresh
+        if (isLoggedIn && !prev && state.items.isEmpty()) {
+            refresh()
+        }
+
+        // logout bo'lsa UI tozalanadi
+        if (!isLoggedIn && prev) {
+            state = NotificationsState(isLoggedIn = false, isLoading = false)
+        }
+    }
 
     fun refresh() {
+        if (!state.isLoggedIn) {
+            // login yo'q -> UI xatosiz, faqat info holat
+            state = state.copy(isLoading = false, error = null, items = emptyList())
+            return
+        }
+
         viewModelScope.launch {
             state = state.copy(isLoading = true, error = null)
             runCatching { repo.list() }
-                .onSuccess { list -> state = state.copy(isLoading = false, items = list) }
-                .onFailure { e -> state = state.copy(isLoading = false, error = e.message ?: "Xatolik") }
+                .onSuccess { list ->
+                    state = state.copy(isLoading = false, items = list, error = null)
+                }
+                .onFailure { e ->
+                    // 401 bo'lsa login state bilan bog'liq bo'lishi mumkin
+                    state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
+                }
         }
     }
 
     fun markRead(id: String) {
+        if (!state.isLoggedIn) return
         viewModelScope.launch {
             runCatching { repo.markRead(id) }
                 .onSuccess { updated ->
@@ -51,22 +78,12 @@ class NotificationsViewModel(
     }
 
     fun markAllRead() {
+        if (!state.isLoggedIn) return
         viewModelScope.launch {
             runCatching { repo.markAllRead() }
                 .onSuccess {
                     state = state.copy(items = state.items.map { it.copy(isRead = true) })
                 }
         }
-    }
-
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val uid = CurrentUser.id(context)
-                    return NotificationsViewModel(NotificationsRemoteRepository(uid)) as T
-                }
-            }
     }
 }

@@ -13,7 +13,11 @@ import com.example.yol_yolakay.feature.publish.PublishUiState
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun Step7Preview(state: PublishUiState) {
+fun Step7Preview(
+    uiState: PublishUiState,
+    onPublish: () -> Unit = {},
+    onEditStep: (Int) -> Unit = {}
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Ma'lumotlarni tekshiring",
@@ -23,13 +27,15 @@ fun Step7Preview(state: PublishUiState) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Ma'lumotlarni chiqarish
-        PreviewItem("Qayerdan:", state.fromLocation)
-        PreviewItem("Qayerga:", state.toLocation)
-        PreviewItem("Sana:", state.date.format(DateTimeFormatter.ISO_DATE))
-        PreviewItem("Vaqt:", state.time.format(DateTimeFormatter.ofPattern("HH:mm")))
-        PreviewItem("Yo'lovchilar:", "${state.passengers} kishi")
-        PreviewItem("Narx:", "${state.price} so'm")
+        // ✅ TUZATILDI: Barcha ma'lumotlar draft ichidan olinmoqda
+
+        PreviewItem("Qayerdan:", uiState.draft.fromLocation?.name ?: "Tanlanmagan")
+        PreviewItem("Qayerga:", uiState.draft.toLocation?.name ?: "Tanlanmagan")
+
+        PreviewItem("Sana:", uiState.draft.date.format(DateTimeFormatter.ISO_DATE))
+        PreviewItem("Vaqt:", uiState.draft.time.format(DateTimeFormatter.ofPattern("HH:mm")))
+        PreviewItem("Yo'lovchilar:", "${uiState.draft.passengers} kishi")
+        PreviewItem("Narx:", "${uiState.draft.price} so'm")
     }
 }
 
