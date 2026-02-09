@@ -54,7 +54,7 @@ fun TripDetailsScreen(
     )
 ) {
     val ctx = LocalContext.current
-    val clientId = remember { CurrentUser.id(ctx) }
+    val clientId = CurrentUser.id(ctx)
 
     val inboxRepo = remember { InboxRemoteRepository() }
     val scope = rememberCoroutineScope()

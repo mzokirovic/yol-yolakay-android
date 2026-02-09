@@ -40,6 +40,7 @@ object BackendClient {
         synchronized(this) {
             if (_client != null) return
             sessionStore = store
+            CurrentUser.bind(store)
             _client = build(context.applicationContext, store)
         }
     }
@@ -107,6 +108,4 @@ object BackendClient {
         _client?.close()
         _client = null
     }
-
-
 }
