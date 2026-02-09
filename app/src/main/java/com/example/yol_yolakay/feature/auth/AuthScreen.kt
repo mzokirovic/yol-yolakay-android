@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.yol_yolakay.core.di.AppGraph
 import com.example.yol_yolakay.core.network.BackendClient
 import com.example.yol_yolakay.core.session.SessionStore
 
@@ -23,10 +24,12 @@ fun AuthScreen(
 ) {
     val ctx = LocalContext.current
 
-    // ViewModelni shu yerda yaratamiz (Dependency Injection soddalashtirilgan)
-    val sessionStore = remember { SessionStore(ctx) }
-    // Clientni init qilamiz (agar qilinmagan bo'lsa)
-    BackendClient.init(ctx, sessionStore)
+    // ✅ Faqat AppGraph store
+    val sessionStore = remember { AppGraph.sessionStore(ctx) }
+
+    // ✅ client init ham AppGraph orqali (safe)
+    LaunchedEffect(Unit) { AppGraph.init(ctx) }
+
     val repo = remember { AuthRemoteRepository(BackendClient.client) }
 
     val vm: AuthViewModel = viewModel(
@@ -36,18 +39,22 @@ fun AuthScreen(
     val state by vm.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Navigatsiya
+    // ✅ Navigatsiya oldidan client reset + qayta init (TOKEN NI 100% o‘qitadi)
     LaunchedEffect(state.event) {
         when (state.event) {
             is AuthEvent.NavigateToHome -> {
+                BackendClient.reset()
+                AppGraph.init(ctx)
                 vm.consumeEvent()
                 onNavigateToHome()
             }
             is AuthEvent.NavigateToCompleteProfile -> {
+                BackendClient.reset()
+                AppGraph.init(ctx)
                 vm.consumeEvent()
                 onNavigateToCompleteProfile()
             }
-            AuthEvent.None -> {}
+            AuthEvent.None -> Unit
         }
     }
 

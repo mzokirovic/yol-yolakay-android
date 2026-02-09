@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppGraph.init(this)
         enableEdgeToEdge()
 
         // ✅ AppGraph init Application’da ham bor, lekin idempotent bo'lsa bu ham xavfsiz.

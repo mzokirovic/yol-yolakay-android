@@ -51,7 +51,7 @@ fun LocationSelector(
             leadingIcon = { Icon(Icons.Default.Place, null) },
             trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = false,
+            enabled = true,
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledBorderColor = MaterialTheme.colorScheme.outline,

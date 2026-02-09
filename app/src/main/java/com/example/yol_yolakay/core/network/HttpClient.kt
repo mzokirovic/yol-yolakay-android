@@ -100,13 +100,13 @@ object BackendClient {
             // Guest/Device ID
             header("X-Device-Id", CurrentUser.deviceId(appContext))
 
-            // Agar User ID sessionda bo'lsa, uni ham qo'shamiz
-            runBlocking {
-                val uid = sessionStore.userIdOrNull()
-                if (!uid.isNullOrBlank()) {
-                    header("x-user-id", uid)
-                }
-            }
         }
     }
+
+    fun reset() {
+        _client?.close()
+        _client = null
+    }
+
+
 }

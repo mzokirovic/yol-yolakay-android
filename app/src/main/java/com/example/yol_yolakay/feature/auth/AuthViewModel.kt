@@ -103,22 +103,31 @@ class AuthViewModel(
 
             _state.update { it.copy(isLoading = true, error = null) }
 
-            runCatching { repo.verifyOtp(finalPhone, code) }
-                .onSuccess { res ->
-                    if (res.token != null && res.userId != null) {
-                        sessionStore.save(res.token, res.refreshToken, res.userId)
-                        // Yangi user bo'lsa profilga, bo'lmasa uyga
-                        val event = if (res.isNewUser) AuthEvent.NavigateToCompleteProfile else AuthEvent.NavigateToHome
-                        _state.update { it.copy(isLoading = false, event = event) }
-                    } else {
-                        _state.update { it.copy(isLoading = false, error = "Serverdan token kelmadi") }
-                    }
+            try {
+                val res = repo.verifyOtp(finalPhone, code)
+
+                val access = res.token
+                val refresh = res.refreshToken
+                val userId = res.userId
+
+                if (!access.isNullOrBlank() && !userId.isNullOrBlank()) {
+                    // ✅ MUHIM: suspend save shu yerda real ishlaydi
+                    sessionStore.save(access, refresh, userId)
+
+                    val event =
+                        if (res.isNewUser) AuthEvent.NavigateToCompleteProfile
+                        else AuthEvent.NavigateToHome
+
+                    _state.update { it.copy(isLoading = false, event = event) }
+                } else {
+                    _state.update { it.copy(isLoading = false, error = "Serverdan token kelmadi") }
                 }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, error = "Kod noto'g'ri yoki eskirgan") }
-                }
+            } catch (e: Throwable) {
+                _state.update { it.copy(isLoading = false, error = e.message ?: "Kod noto'g'ri yoki eskirgan") }
+            }
         }
     }
+
 
     fun backToPhone() {
         _state.update { it.copy(step = AuthStep.PHONE, code = "", error = null) }
