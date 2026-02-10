@@ -34,22 +34,28 @@ fun MyTripsScreen(
     viewModel: MyTripsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
     var selectedTab by remember { mutableStateOf(MyTripsTab.DRIVER) }
 
-    // Mantiq o'zgarmadi: Tab almashganda yuklash
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == MyTripsTab.DRIVER) {
-            viewModel.loadMyTrips()
-        }
+    LaunchedEffect(Unit) {
+        viewModel.loadMyTrips()
     }
+
+    val driverTrips = remember(uiState.trips) {
+        uiState.trips.filter { it.myRole == "driver" }
+    }
+    val passengerTrips = remember(uiState.trips) {
+        uiState.trips.filter { it.myRole == "passenger" }
+    }
+
+    val listForTab = if (selectedTab == MyTripsTab.DRIVER) driverTrips else passengerTrips
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) // Orqa fonni biroz "yumshatdik"
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
     ) {
 
-        // TabRow vizual yangilandi (shadow va ranglar), lekin ishlash prinsipi o'sha
         Surface(shadowElevation = 2.dp, color = MaterialTheme.colorScheme.surface) {
             TabRow(
                 selectedTabIndex = if (selectedTab == MyTripsTab.DRIVER) 0 else 1,
@@ -72,56 +78,48 @@ fun MyTripsScreen(
         }
 
         Box(Modifier.fillMaxSize()) {
-            when (selectedTab) {
-                MyTripsTab.DRIVER -> {
-                    when {
-                        uiState.isLoading ->
-                            CircularProgressIndicator(Modifier.align(Alignment.Center))
+            when {
+                uiState.isLoading ->
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
 
-                        uiState.error != null ->
-                            // Xatolik xabarini chiroyliroq qildik
-                            Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(uiState.error!!, color = MaterialTheme.colorScheme.error)
-                            }
+                uiState.error != null ->
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(uiState.error!!, color = MaterialTheme.colorScheme.error)
+                    }
 
-                        uiState.trips.isEmpty() ->
-                            // Bo'sh holat (Empty State) vizualizatsiyasi
-                            EmptyStateMessage(
-                                message = "Hali e’lon qilingan safarlar yo‘q",
-                                icon = Icons.Default.AddRoad,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-
-                        else -> LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(uiState.trips) { trip ->
-                                // ESKI TripItem O'RNIGA YANGI VISUAL KARTA
-                                // Bu faqat ko'rinishni o'zgartiradi, mantiqni emas.
-                                DriverTripCard(
-                                    trip = trip,
-                                    onClick = {
-                                        val id = trip.id
-                                        if (!id.isNullOrBlank()) onTripClick(id)
-                                    }
-                                )
-                            }
-                        }
+                listForTab.isEmpty() -> {
+                    if (selectedTab == MyTripsTab.DRIVER) {
+                        EmptyStateMessage(
+                            message = "Hali e’lon qilingan safarlar yo‘q",
+                            icon = Icons.Default.AddRoad,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        EmptyStateMessage(
+                            message = "Hali bron qilingan safarlar yo‘q",
+                            subMessage = "Biror safarga joy so‘rasangiz, shu yerda ko‘rinadi",
+                            icon = Icons.Default.HourglassEmpty,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
                     }
                 }
 
-                MyTripsTab.PASSENGER -> {
-                    // Yo'lovchi qismi mantig'i o'zgarmadi, faqat markazlashtirildi
-                    EmptyStateMessage(
-                        message = "Yo‘lovchi safarlari (bronlar) tez kunda",
-                        subMessage = "Keyingi bosqich: Bookings endpoint + MyBookings list",
-                        icon = Icons.Default.HourglassEmpty,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                else -> LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(listForTab) { trip ->
+                        DriverTripCard(
+                            trip = trip,
+                            onClick = {
+                                val id = trip.id
+                                if (!id.isNullOrBlank()) onTripClick(id)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -129,7 +127,7 @@ fun MyTripsScreen(
 }
 
 // ---------------------------------------------------------
-// YANGI VIZUAL KOMPONENTLAR (UI Logic Only)
+// UI KOMPONENTLAR
 // ---------------------------------------------------------
 
 @Composable
@@ -137,7 +135,6 @@ private fun DriverTripCard(
     trip: com.example.yol_yolakay.core.network.model.TripApiModel,
     onClick: () -> Unit
 ) {
-    // Vaqtni formatlash (UI uchun)
     val depTime = remember(trip.departureTime) {
         runCatching {
             OffsetDateTime.parse(trip.departureTime).format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -153,19 +150,17 @@ private fun DriverTripCard(
             .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Status va Narx
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Status chip (Haydovchi uchun o'z e'loni faol ekanini ko'rsatish)
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Faol", // Yoki trip.status (agar backendda bo'lsa)
+                        text = if (trip.myRole == "passenger") "Yo‘lovchi" else "Haydovchi",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold,
@@ -183,9 +178,7 @@ private fun DriverTripCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // Body: Timeline (Vaqt va Shaharlar)
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                // 1. Vaqt
                 Column(
                     modifier = Modifier.width(50.dp),
                     horizontalAlignment = Alignment.End
@@ -193,7 +186,6 @@ private fun DriverTripCard(
                     Text(depTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
-                // 2. Chiziq (Timeline) - Option B dizayni
                 Column(
                     modifier = Modifier
                         .padding(horizontal = 12.dp)
@@ -217,13 +209,12 @@ private fun DriverTripCard(
                     Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                // 3. Shaharlar
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(trip.fromCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(16.dp)) // Shaharlar orasini ochish
+                    Spacer(Modifier.height(16.dp))
                     Text(trip.toCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
@@ -232,7 +223,6 @@ private fun DriverTripCard(
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.height(10.dp))
 
-            // Footer: Mavjud joylar
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Person, contentDescription = null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(6.dp))

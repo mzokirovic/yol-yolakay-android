@@ -1,11 +1,6 @@
-// /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/feature/tripdetails/TripDetailsScreen.kt
-
 package com.example.yol_yolakay.feature.tripdetails
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,8 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.SeatApiModel
-import com.example.yol_yolakay.core.network.model.TripApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
+import com.example.yol_yolakay.core.session.SessionStore
 import com.example.yol_yolakay.feature.inbox.InboxRemoteRepository
 import com.example.yol_yolakay.feature.tripdetails.components.SeatMap
 import kotlinx.coroutines.launch
@@ -54,7 +49,13 @@ fun TripDetailsScreen(
     )
 ) {
     val ctx = LocalContext.current
-    val clientId = CurrentUser.id(ctx)
+
+    // ✅ Real userId (Supabase) — agar bo‘lsa shu ishlaydi, bo‘lmasa deviceId fallback
+    val sessionStore = remember { SessionStore(ctx.applicationContext) }
+    val realUserId by produceState<String?>(initialValue = null) {
+        value = runCatching { sessionStore.userIdOrNull() }.getOrNull()
+    }
+    val clientId = realUserId ?: CurrentUser.id(ctx)
 
     val inboxRepo = remember { InboxRemoteRepository() }
     val scope = rememberCoroutineScope()
@@ -68,19 +69,17 @@ fun TripDetailsScreen(
 
     val trip = ui.trip
 
-    // --- MANTIQIY O'ZGARUVCHILAR ---
-    val isDriver = remember(trip, clientId) { trip?.driverId != null && trip.driverId == clientId }
+    val isDriver = remember(trip, clientId) {
+        !trip?.driverId.isNullOrBlank() && trip?.driverId == clientId
+    }
 
     val iBooked = remember(ui.seats, clientId) {
         ui.seats.any { it.status == "booked" && it.holderClientId == clientId }
     }
 
-    // ✅ TUZATILDI: canChatWithDriver o'zgaruvchisi qo'shildi
     val canChatWithDriver = remember(trip) { !trip?.driverId.isNullOrBlank() }
-
     val canOpenChat = isDriver || (iBooked && canChatWithDriver)
 
-    // --- FORMATLASH ---
     val dep = remember(trip?.departureTime) { trip?.departureTime?.let(::parseDeparture) }
     val datePretty = remember(dep) {
         dep?.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale("uz")))
@@ -88,7 +87,6 @@ fun TripDetailsScreen(
     }
     val timePretty = remember(dep) { dep?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—:—" }
 
-    // --- BOTTOM SHEET ---
     SeatActionBottomSheet(
         selectedSeatNo = ui.selectedSeatNo,
         seats = ui.seats,
@@ -144,19 +142,13 @@ fun TripDetailsScreen(
     ) { pad ->
         Box(modifier = Modifier.padding(pad).fillMaxSize()) {
             when {
-                ui.isLoading -> {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center))
-                }
-                ui.error != null -> {
-                    ErrorState(
-                        message = ui.error!!,
-                        onRetry = { viewModel.load(tripId) },
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                trip == null -> {
-                    Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center))
-                }
+                ui.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                ui.error != null -> ErrorState(
+                    message = ui.error!!,
+                    onRetry = { viewModel.load(tripId) },
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                trip == null -> Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center))
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -198,11 +190,8 @@ fun TripDetailsScreen(
                             }
                         }
 
-                        // ✅ ENDI BU QISMDA XATO BO'LMAYDI
                         item {
-                            AnimatedVisibility(
-                                visible = (!isDriver && iBooked && !canChatWithDriver),
-                            ) {
+                            AnimatedVisibility(visible = (!isDriver && iBooked && !canChatWithDriver)) {
                                 AssistiveInfo(text = "Diqqat: Haydovchi bilan bog'lanishda muammo bo'lsa, iltimos qo'llab-quvvatlash xizmatiga yozing.")
                             }
                         }
@@ -407,7 +396,11 @@ private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean,
             ) {
                 Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (isDriver) "Chatlar (Yo‘lovchilar)" else "Haydovchiga yozish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (isDriver) "Chatlar (Yo‘lovchilar)" else "Haydovchiga yozish",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
@@ -415,7 +408,11 @@ private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean,
 
 @Composable
 private fun AssistiveInfo(text: String) {
-    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
         }
@@ -454,11 +451,37 @@ private fun SeatActionBottomSheet(
     val status = seat.status
     val isMine = seat.holderClientId == clientId
 
+    // ✅ KO‘RINISH QOIDASI:
+    // - Driver: pending/booked ko‘radi
+    // - Passenger: faqat booked (pending boshqalarniki ko‘rinmaydi), pending faqat o‘ziniki bo‘lsa ko‘rinadi
+    val canSeeHolderInfo =
+        isDriver || status == "booked" || (status == "pending" && isMine)
+
+    val displayName = seat.holderProfile?.displayName
+        ?: seat.holderName
+        ?: "Noma’lum yo‘lovchi"
+
+    val ratingText = seat.holderProfile?.rating?.let { String.format(Locale.US, "%.1f", it) } ?: "—"
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("Joy №$selectedSeatNo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 val (txt, col) = when (status) {
                     "available" -> "Bo‘sh" to Color(0xFF4CAF50)
@@ -468,17 +491,21 @@ private fun SeatActionBottomSheet(
                     else -> status to Color.Gray
                 }
                 Surface(color = col.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
-                    Text(txt, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = col, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        txt,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        color = col,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
 
-            if (status == "booked" || status == "pending") {
-                val who = seat.holderName?.takeIf { it.isNotBlank() } ?: "Noma’lum yo'lovchi"
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(8.dp))
-                    Text(who, style = MaterialTheme.typography.bodyLarge)
-                }
+            if (canSeeHolderInfo && (status == "booked" || status == "pending")) {
+                PassengerInfoRow(
+                    name = displayName,
+                    ratingText = ratingText
+                )
                 HorizontalDivider()
             }
 
@@ -505,16 +532,58 @@ private fun SeatActionBottomSheet(
 }
 
 @Composable
+private fun PassengerInfoRow(
+    name: String,
+    ratingText: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // ✅ Avatar (URL bo‘lsa keyin coil bilan ko‘rsatamiz), hozir initial placeholder
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(44.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = name.take(1).uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(ratingText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun PrimaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = !isBusy, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) {
-        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White) else Text(text)
+    Button(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+        else Text(text)
     }
 }
 
 @Composable
 private fun SecondaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = !isBusy, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) {
-        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp)) else Text(text)
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp))
+        else Text(text)
     }
 }
 

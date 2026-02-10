@@ -22,5 +22,8 @@ data class TripApiModel(
     // ✅ Chat uchun kerak:
     // Backend ba’zan driver_id, ba’zan driverId chiqarishi mumkin.
     @JsonNames("driver_id", "driverId")
-    val driverId: String? = null
+    val driverId: String? = null,
+
+    @SerialName("my_role")
+    val myRole: String? = null
 )
