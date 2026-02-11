@@ -135,6 +135,36 @@ class TripDetailsViewModel(
         }
     }
 
+
+    fun startTrip(tripId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLifecycleBusy = true, error = null) }
+            repository.startTrip(tripId)
+                .onSuccess { res ->
+                    _uiState.update { it.copy(isLifecycleBusy = false, trip = res.trip, seats = res.seats) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isLifecycleBusy = false, error = e.message) }
+                }
+        }
+    }
+
+    fun finishTrip(tripId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLifecycleBusy = true, error = null) }
+            repository.finishTrip(tripId)
+                .onSuccess { res ->
+                    _uiState.update { it.copy(isLifecycleBusy = false, trip = res.trip, seats = res.seats) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isLifecycleBusy = false, error = e.message) }
+                }
+        }
+    }
+
+
+
+
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

@@ -3,13 +3,25 @@
 package com.example.yol_yolakay.feature.tripdetails
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +33,39 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,11 +76,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.SeatApiModel
-import com.example.yol_yolakay.core.network.model.TripApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
 import com.example.yol_yolakay.feature.inbox.InboxRemoteRepository
 import com.example.yol_yolakay.feature.tripdetails.components.SeatMap
+import com.example.yol_yolakay.feature.tripdetails.components.TripLifecycleCard
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -60,6 +105,9 @@ fun TripDetailsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // ✅ 0 ta bron bo‘lsa start confirm
+    var startConfirmOpen by remember { mutableStateOf(false) }
+
     val ui by viewModel.uiState.collectAsState()
 
     LaunchedEffect(tripId) {
@@ -75,9 +123,7 @@ fun TripDetailsScreen(
         ui.seats.any { it.status == "booked" && it.holderClientId == clientId }
     }
 
-    // ✅ TUZATILDI: canChatWithDriver o'zgaruvchisi qo'shildi
     val canChatWithDriver = remember(trip) { !trip?.driverId.isNullOrBlank() }
-
     val canOpenChat = isDriver || (iBooked && canChatWithDriver)
 
     // --- FORMATLASH ---
@@ -88,6 +134,44 @@ fun TripDetailsScreen(
     }
     val timePretty = remember(dep) { dep?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—:—" }
 
+    // --- STATUS + TIME (UI LOCK) ---
+    val tripStatus = remember(trip?.status) { normalizeStatus(trip?.status) }
+
+    // Ekran ochiq turganda vaqt o‘tishini ham sezish uchun "now" ni yangilab turamiz
+    val now by produceState(initialValue = Instant.now(), key1 = dep, key2 = tripStatus) {
+        while (true) {
+            value = Instant.now()
+            delay(30_000) // 30s da bir yangilanadi (MVP)
+        }
+    }
+
+    val timeLocked = remember(dep, now) {
+        dep?.toInstant()?.isBefore(now) ?: false
+    }
+
+    // active bo‘lmasa lock; yoki departure o‘tib ketgan bo‘lsa lock
+    val uiLocked = remember(tripStatus, timeLocked) {
+        (tripStatus != "active") || timeLocked
+    }
+
+    // bookedCount (driver uchun ko‘rsatamiz)
+    val bookedCount by remember(ui.seats) {
+        derivedStateOf { ui.seats.count { it.status == "booked" } }
+    }
+
+    // Start faqat now >= dep (dep null bo‘lsa start yo‘q)
+    val canStartNow = remember(dep, now) {
+        dep?.toInstant()?.let { !it.isAfter(now) } ?: false
+    }
+
+    val startEnabled = remember(tripStatus, canStartNow) {
+        tripStatus == "active" && canStartNow
+    }
+
+    val finishEnabled = remember(tripStatus) {
+        tripStatus == "in_progress"
+    }
+
     // --- BOTTOM SHEET ---
     SeatActionBottomSheet(
         selectedSeatNo = ui.selectedSeatNo,
@@ -95,6 +179,8 @@ fun TripDetailsScreen(
         isDriver = isDriver,
         clientId = clientId,
         isBusy = ui.isBooking,
+        uiLocked = uiLocked,
+        onInfo = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
         onDismiss = viewModel::closeSeatSheet,
         onRequest = { seatNo -> viewModel.requestSeat(tripId, seatNo) },
         onCancel = { seatNo -> viewModel.cancelRequest(tripId, seatNo) },
@@ -103,6 +189,26 @@ fun TripDetailsScreen(
         onBlock = { seatNo -> viewModel.blockSeat(tripId, seatNo) },
         onUnblock = { seatNo -> viewModel.unblockSeat(tripId, seatNo) }
     )
+
+    // ✅ START CONFIRM (0 bron bo‘lsa)
+    if (startConfirmOpen) {
+        AlertDialog(
+            onDismissRequest = { startConfirmOpen = false },
+            title = { Text("Yo‘lovchi yo‘q") },
+            text = { Text("Hozircha hech kim bron qilmagan. Baribir safarni boshlaysizmi?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        startConfirmOpen = false
+                        viewModel.startTrip(tripId)
+                    }
+                ) { Text("Boshlash") }
+            },
+            dismissButton = {
+                TextButton(onClick = { startConfirmOpen = false }) { Text("Bekor") }
+            }
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -147,6 +253,7 @@ fun TripDetailsScreen(
                 ui.isLoading -> {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 }
+
                 ui.error != null -> {
                     ErrorState(
                         message = ui.error!!,
@@ -154,9 +261,11 @@ fun TripDetailsScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
+
                 trip == null -> {
                     Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center))
                 }
+
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -182,6 +291,24 @@ fun TripDetailsScreen(
                         }
 
                         item {
+                            if (isDriver) {
+                                TripLifecycleCard(
+                                    status = tripStatus,            // ✅ backend status
+                                    isBusy = ui.isLifecycleBusy,
+                                    startEnabled = startEnabled,
+                                    finishEnabled = finishEnabled,
+                                    bookedCount = bookedCount,
+                                    onStart = {
+                                        // 0 bron bo‘lsa confirm
+                                        if (bookedCount == 0) startConfirmOpen = true
+                                        else viewModel.startTrip(tripId)
+                                    },
+                                    onFinish = { viewModel.finishTrip(tripId) }
+                                )
+                            }
+                        }
+
+                        item {
                             Text(
                                 "Joyni tanlang",
                                 style = MaterialTheme.typography.titleMedium,
@@ -193,24 +320,35 @@ fun TripDetailsScreen(
                                     seats = ui.seats,
                                     clientId = clientId,
                                     isDriver = isDriver,
+                                    uiLocked = uiLocked,
                                     onSeatClick = viewModel::onSeatClick
                                 )
                             }
                         }
 
-                        // ✅ ENDI BU QISMDA XATO BO'LMAYDI
                         item {
-                            AnimatedVisibility(
-                                visible = (!isDriver && iBooked && !canChatWithDriver),
-                            ) {
-                                AssistiveInfo(text = "Diqqat: Haydovchi bilan bog'lanishda muammo bo'lsa, iltimos qo'llab-quvvatlash xizmatiga yozing.")
+                            AnimatedVisibility(visible = (!isDriver && iBooked && !canChatWithDriver)) {
+                                AssistiveInfo(
+                                    text = "Diqqat: Haydovchi bilan bog'lanishda muammo bo'lsa, iltimos qo'llab-quvvatlash xizmatiga yozing."
+                                )
                             }
+                        }
+
+                        // Kichik status chip (xohlasangiz)
+                        item {
+                            val label = when (tripStatus) {
+                                "active" -> "active"
+                                "in_progress" -> "in_progress"
+                                "finished" -> "finished"
+                                else -> tripStatus
+                            }
+                            AssistChip(onClick = {}, label = { Text("status: $label") })
                         }
                     }
                 }
             }
 
-            if (ui.isBooking) {
+            if (ui.isBooking || ui.isLifecycleBusy) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -289,7 +427,12 @@ private fun TripHeaderCard(
             Spacer(Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.DirectionsCar, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Default.DirectionsCar,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
                 Spacer(Modifier.width(8.dp))
                 Text("$availableSeats ta joy qoldi", fontWeight = FontWeight.Medium)
             }
@@ -313,7 +456,12 @@ fun TripTimeline(
             horizontalAlignment = Alignment.End
         ) {
             Text(departureTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(arrivalTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                arrivalTime,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         Column(
@@ -360,7 +508,12 @@ private fun DriverInfoCard(driverName: String, carModel: String) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(50.dp)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(driverName.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Text(
+                        driverName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
             Spacer(Modifier.width(16.dp))
@@ -407,7 +560,11 @@ private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean,
             ) {
                 Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (isDriver) "Chatlar (Yo‘lovchilar)" else "Haydovchiga yozish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (isDriver) "Chatlar (Yo‘lovchilar)" else "Haydovchiga yozish",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
@@ -415,7 +572,11 @@ private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean,
 
 @Composable
 private fun AssistiveInfo(text: String) {
-    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
         }
@@ -441,6 +602,8 @@ private fun SeatActionBottomSheet(
     isDriver: Boolean,
     clientId: String,
     isBusy: Boolean,
+    uiLocked: Boolean,
+    onInfo: (String) -> Unit,
     onDismiss: () -> Unit,
     onRequest: (Int) -> Unit,
     onCancel: (Int) -> Unit,
@@ -451,15 +614,33 @@ private fun SeatActionBottomSheet(
 ) {
     if (selectedSeatNo == null) return
     val seat = seats.find { it.seatNo == selectedSeatNo } ?: return
-    val status = seat.status
-    val isMine = seat.holderClientId == clientId
 
+    // UI lock bo‘lsa: booked’dan boshqasi UI’da “blocked”
+    val rawStatus = seat.status
+    val status = if (uiLocked && rawStatus != "booked") "blocked" else rawStatus
+
+    val isMine = seat.holderClientId == clientId
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("Joy №$selectedSeatNo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
                 val (txt, col) = when (status) {
                     "available" -> "Bo‘sh" to Color(0xFF4CAF50)
                     "booked" -> (if (isMine) "Sizniki" else "Band") to Color.Gray
@@ -467,8 +648,15 @@ private fun SeatActionBottomSheet(
                     "blocked" -> "Yopiq" to Color.Red
                     else -> status to Color.Gray
                 }
+
                 Surface(color = col.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
-                    Text(txt, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = col, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        txt,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        color = col,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
 
@@ -486,12 +674,27 @@ private fun SeatActionBottomSheet(
                 when (status) {
                     "pending" -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(Modifier.weight(1f)) { SecondaryButton("Rad etish", isBusy) { onReject(selectedSeatNo) } }
-                            Box(Modifier.weight(1f)) { PrimaryButton("Tasdiqlash", isBusy) { onApprove(selectedSeatNo) } }
+                            Box(Modifier.weight(1f)) {
+                                SecondaryButton("Rad etish", isBusy) { onReject(selectedSeatNo) }
+                            }
+                            Box(Modifier.weight(1f)) {
+                                PrimaryButton("Tasdiqlash", isBusy) { onApprove(selectedSeatNo) }
+                            }
                         }
                     }
+
                     "available" -> SecondaryButton("Joyni yopish (Block)", isBusy) { onBlock(selectedSeatNo) }
-                    "blocked" -> SecondaryButton("Joyni ochish (Unblock)", isBusy) { onUnblock(selectedSeatNo) }
+
+                    "blocked" -> {
+                        if (uiLocked) {
+                            SecondaryButton("Joyni ochish (Unblock)", isBusy = false) {
+                                onInfo("Safar boshlangan (yoki vaqt o‘tgan). Hozircha joylarni ochib bo‘lmaydi.")
+                                onDismiss()
+                            }
+                        } else {
+                            SecondaryButton("Joyni ochish (Unblock)", isBusy) { onUnblock(selectedSeatNo) }
+                        }
+                    }
                 }
             } else {
                 if (status == "available") {
@@ -506,17 +709,36 @@ private fun SeatActionBottomSheet(
 
 @Composable
 private fun PrimaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = !isBusy, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) {
+    Button(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
         if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White) else Text(text)
     }
 }
 
 @Composable
 private fun SecondaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = !isBusy, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isBusy,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
         if (isBusy) CircularProgressIndicator(Modifier.size(24.dp)) else Text(text)
     }
 }
 
 private fun parseDeparture(raw: String): OffsetDateTime? =
     runCatching { OffsetDateTime.parse(raw) }.getOrNull()
+
+private fun normalizeStatus(raw: String?): String {
+    val s = (raw ?: "active").trim().lowercase()
+    return when (s) {
+        "inprogress", "in-progress", "started" -> "in_progress"
+        "done", "completed" -> "finished"
+        else -> s
+    }
+}

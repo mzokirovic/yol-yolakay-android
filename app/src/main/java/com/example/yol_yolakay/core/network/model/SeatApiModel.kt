@@ -9,5 +9,6 @@ data class SeatApiModel(
     val status: String, // available|booked|pending|blocked
     @SerialName("holder_name") val holderName: String? = null,
     @SerialName("holder_client_id") val holderClientId: String? = null,
-    @SerialName("locked_by_driver") val lockedByDriver: Boolean = false
+    @SerialName("locked_by_driver") val lockedByDriver: Boolean = false,
+    @SerialName("holder_profile") val holderProfile: PublicProfileApiModel? = null
 )
