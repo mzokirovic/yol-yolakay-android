@@ -13,5 +13,7 @@ data class TripDetailsUiState(
 
     // UI interaksiyasi uchun (Seat tanlash va Bron qilish jarayoni)
     val selectedSeatNo: Int? = null,
-    val isBooking: Boolean = false
+    val isBooking: Boolean = false,
+
+    val isLifecycleBusy: Boolean = false
 )

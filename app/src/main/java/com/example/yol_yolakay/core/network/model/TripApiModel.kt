@@ -24,6 +24,7 @@ data class TripApiModel(
     @JsonNames("driver_id", "driverId")
     val driverId: String? = null,
 
-    @SerialName("my_role")
-    val myRole: String? = null
+    @SerialName("status") val status: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("ended_at") val endedAt: String? = null
 )

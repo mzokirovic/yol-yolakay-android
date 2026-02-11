@@ -1,8 +1,7 @@
-// /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/data/repository/TripRepository.kt
-
 package com.example.yol_yolakay.data.repository
 
 import com.example.yol_yolakay.core.network.BackendClient
+import com.example.yol_yolakay.core.network.model.ApiErrorResponse
 import com.example.yol_yolakay.core.network.model.TripApiModel
 import com.example.yol_yolakay.core.network.model.TripDetailsResponse
 import com.example.yol_yolakay.core.network.model.TripResponse
@@ -13,18 +12,20 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 class TripRepository {
 
     private val client = BackendClient.client
 
-    // 🚨 attachUser helperi olib tashlandi (Global Interceptor ishlaydi)
-
-    // --- DATA CLASSES ---
+    // --- REQUEST/RESPONSE DTOs ---
     @Serializable
     private data class SeatRequestBody(val holderName: String? = null)
 
@@ -58,18 +59,63 @@ class TripRepository {
         val max: Double
     )
 
+    // --- ERROR PARSER (FINAL) ---
+    private val errJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    private class BackendException(
+        val status: Int,
+        override val message: String
+    ) : Exception(message)
+
+    private suspend fun HttpResponse.prettyError(prefix: String): BackendException {
+        val fallback = "$prefix: HTTP ${status.value}"
+
+        val text = runCatching { bodyAsText() }
+            .getOrNull()
+            .orEmpty()
+            .trim()
+
+        if (text.isBlank()) return BackendException(status.value, fallback)
+
+        val msg = runCatching {
+            // HTML yoki oddiy text qaytsa ham yiqilmasin
+            errJson.decodeFromString<ApiErrorResponse>(text).bestMessage()
+        }.getOrNull()
+
+        val finalMsg = msg?.takeIf { it.isNotBlank() }
+            ?: text.take(200).takeIf { it.isNotBlank() }
+            ?: fallback
+
+        return BackendException(status.value, finalMsg)
+    }
+
+    private suspend inline fun <reified T> HttpResponse.bodyOrFail(prefix: String): Result<T> = try {
+        if (status.isSuccess()) Result.success(body())
+        else Result.failure(prettyError(prefix))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    private suspend fun HttpResponse.unitOrFail(prefix: String): Result<Unit> = try {
+        if (status.isSuccess()) Result.success(Unit)
+        else Result.failure(prettyError(prefix))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     // --- METHODS ---
 
-    suspend fun getPricePreview(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): Result<PricePreviewResponse> = try {
+    suspend fun getPricePreview(
+        fromLat: Double, fromLng: Double, toLat: Double, toLng: Double
+    ): Result<PricePreviewResponse> = try {
         val resp = client.post("api/trips/calculate-price") {
             contentType(ContentType.Application.Json)
             setBody(PricePreviewRequest(fromLat, fromLng, toLat, toLng))
         }
-        if (resp.status.isSuccess()) {
-            Result.success(resp.body())
-        } else {
-            Result.failure(Exception("HTTP ${resp.status.value}"))
-        }
+        resp.bodyOrFail("PricePreview")
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -78,22 +124,21 @@ class TripRepository {
         val resp = client.get("api/trips/points") {
             if (!city.isNullOrBlank()) parameter("city", city)
         }
-        if (resp.status.isSuccess()) {
-            val body = resp.body<PointsResponse>()
-            val uiList = body.data.map { dto ->
-                LocationModel(
-                    name = "${dto.city_name} (${dto.point_name})",
-                    lat = dto.latitude,
-                    lng = dto.longitude,
-                    pointId = dto.id,
-                    region = dto.region_name ?: "Boshqa"
-                )
+
+        resp.bodyOrFail<PointsResponse>("Points")
+            .map { body ->
+                body.data.map { dto ->
+                    LocationModel(
+                        name = "${dto.city_name} (${dto.point_name})",
+                        lat = dto.latitude,
+                        lng = dto.longitude,
+                        pointId = dto.id,
+                        region = dto.region_name ?: "Boshqa"
+                    )
+                }
             }
-            Result.success(uiList)
-        } else {
-            Result.failure(Exception("HTTP ${resp.status.value}"))
-        }
     } catch (e: Exception) {
+        // MVP fallback (offline/demo)
         val mockPoints = listOf(
             LocationModel("Toshkent (Olmazor Metro)", 41.2858, 69.2040, "mock_1", "Toshkent shahri"),
             LocationModel("Toshkent (Qo'yliq)", 41.2345, 69.3456, "mock_2", "Toshkent shahri")
@@ -101,72 +146,110 @@ class TripRepository {
         Result.success(mockPoints)
     }
 
-    suspend fun searchTrips(from: String? = null, to: String? = null, date: String? = null, passengers: Int? = null): Result<List<TripApiModel>> = try {
+    suspend fun searchTrips(
+        from: String? = null,
+        to: String? = null,
+        date: String? = null,
+        passengers: Int? = null
+    ): Result<List<TripApiModel>> = try {
         val resp = client.get("api/trips/search") {
             if (!from.isNullOrBlank()) parameter("from", from)
             if (!to.isNullOrBlank()) parameter("to", to)
             if (!date.isNullOrBlank()) parameter("date", date)
             if (passengers != null) parameter("passengers", passengers)
         }
-        if (resp.status.isSuccess()) {
-            val body = resp.body<TripResponse>()
-            if (body.success) Result.success(body.data) else Result.failure(Exception("Search success=false"))
-        } else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+
+        resp.bodyOrFail<TripResponse>("Search").map { body ->
+            if (body.success) body.data else throw Exception("Search success=false")
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun publishTrip(req: PublishTripRequest): Result<Unit> = try {
         val resp = client.post("api/trips/publish") {
-            // attachUser kerak emas, ID headerdan olinadi
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (resp.status.isSuccess()) Result.success(Unit) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.unitOrFail("PublishTrip")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun getMyTrips(): Result<List<TripApiModel>> = try {
         val resp = client.get("api/trips/my")
-        if (resp.status.isSuccess()) {
-            val body = resp.body<TripResponse>()
-            if (body.success) Result.success(body.data) else Result.failure(Exception("MyTrips success=false"))
-        } else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail<TripResponse>("MyTrips").map { body ->
+            if (body.success) body.data else throw Exception("MyTrips success=false")
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun getTripDetails(tripId: String): Result<TripDetailsResponse> = try {
         val resp = client.get("api/trips/$tripId")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("TripDetails")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
-    // ✅ YANGI: argumentlar tozalandi (faqat logika uchun keraklilari qoldi)
+    // --- SEATS ---
     suspend fun requestSeat(tripId: String, seatNo: Int, holderName: String? = null): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/request") {
             contentType(ContentType.Application.Json)
             setBody(SeatRequestBody(holderName))
         }
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("RequestSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun cancelSeatRequest(tripId: String, seatNo: Int): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/cancel")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("CancelSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun approveSeat(tripId: String, seatNo: Int): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/approve")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("ApproveSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun rejectSeat(tripId: String, seatNo: Int): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/reject")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("RejectSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun blockSeat(tripId: String, seatNo: Int): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/block")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("BlockSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun unblockSeat(tripId: String, seatNo: Int): Result<TripDetailsResponse> = try {
         val resp = client.post("api/trips/$tripId/seats/$seatNo/unblock")
-        if (resp.status.isSuccess()) Result.success(resp.body()) else Result.failure(Exception("HTTP ${resp.status.value}"))
-    } catch (e: Exception) { Result.failure(e) }
+        resp.bodyOrFail("UnblockSeat")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    // --- LIFECYCLE ---
+    suspend fun startTrip(tripId: String): Result<TripDetailsResponse> = try {
+        val resp = client.post("api/trips/$tripId/start")
+        resp.bodyOrFail("StartTrip")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun finishTrip(tripId: String): Result<TripDetailsResponse> = try {
+        val resp = client.post("api/trips/$tripId/finish")
+        resp.bodyOrFail("FinishTrip")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }

@@ -1,0 +1,15 @@
+# Gradle / build
+.gradle/
+**/build/
+caches/
+daemon/
+native/
+wrapper/
+kotlin-profile/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Local machine secrets
+local.properties
