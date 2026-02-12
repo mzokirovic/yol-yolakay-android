@@ -1,15 +1,52 @@
-# Gradle / build
+# Gradle
 .gradle/
+build/
 **/build/
-caches/
-daemon/
-native/
-wrapper/
-kotlin-profile/
+
+# Local config
+local.properties
 
 # Android Studio / IntelliJ
 .idea/
 *.iml
 
-# Local machine secrets
+# Kotlin
+.kotlin/
+kotlin-profile/
+
+# OS
+.DS_Store
+
+# Logs / temp
+*.log
+.tmp/
+caches/
+daemon/
+
+# Keys
+*.jks
+*.keystore
+
+# ---- Build/Cache junk (DO NOT COMMIT) ----
+.gradle/
+**/build/
+build/
+caches/
+daemon/
+kotlin-profile/
+.kotlin/
+.tmp/
+build-scan-data/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Local-only
 local.properties
+
+# Native / wrapper duplicates (if accidental)
+native/
+wrapper/
+android/
+
