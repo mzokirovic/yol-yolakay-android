@@ -61,8 +61,6 @@ class MainActivity : ComponentActivity() {
         AppGraph.init(this)
         enableEdgeToEdge()
 
-        // ✅ AppGraph init Application’da ham bor, lekin idempotent bo'lsa bu ham xavfsiz.
-        AppGraph.init(this)
         sessionStore = AppGraph.sessionStore(this)
         BackendClient.init(this, sessionStore)
 
@@ -159,7 +157,10 @@ private fun AppRoot(
     deepLink: AppDeepLink?,
     onDeepLinkHandled: () -> Unit
 ) {
-    val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
+    val isLoggedIn by sessionStore.isLoggedIn.collectAsState(
+        initial = !sessionStore.accessTokenCached().isNullOrBlank()
+    )
+
     var authCompleted by remember { mutableStateOf(false) }
     var profileState by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
 

@@ -254,11 +254,12 @@ private fun SeatCard(
 
             when (ui) {
                 SeatUiStatus.MINE_BOOKED, SeatUiStatus.BOOKED -> {
-                    val initial = seat?.holderName
-                        ?.trim()
-                        ?.firstOrNull()
-                        ?.uppercaseChar()
-                        ?.toString() ?: "?"
+                    val displayName =
+                        seat?.holderProfile?.displayName?.trim()?.takeIf { it.isNotBlank() }
+                            ?: seat?.holderName?.trim()?.takeIf { it.isNotBlank() }
+
+                    val initial = displayName?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
 
                     Text(
                         initial,

@@ -20,16 +20,32 @@ object CurrentUser {
      * - login bo‘lmasa: clientId = ANDROID_ID
      */
     fun id(context: Context): String {
-        val uid = store?.userIdCached()
-            ?: run {
-                // fallback: agar user_id saqlanmagan bo‘lsa, access token’dan sub o‘qib olamiz
-                val access = store?.accessTokenCached()
-                // SessionStore allaqachon jwtSub bilan cache qiladi, lekin yana fallback qoldiramiz:
-                null
-            }
+        val s = store
+        val uid =
+            s?.userIdCached()
+                ?: s?.accessTokenCached()?.let { jwtSub(it) }
 
         return uid ?: deviceId(context)
     }
+
+    private fun jwtSub(accessToken: String): String? {
+        return try {
+            val parts = accessToken.split(".")
+            if (parts.size < 2) return null
+            val payload = parts[1]
+            val jsonBytes = android.util.Base64.decode(
+                payload,
+                android.util.Base64.URL_SAFE or
+                        android.util.Base64.NO_WRAP or
+                        android.util.Base64.NO_PADDING
+            )
+            val obj = org.json.JSONObject(String(jsonBytes))
+            obj.optString("sub").takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
 
     fun displayName(): String = "Guest"
 }

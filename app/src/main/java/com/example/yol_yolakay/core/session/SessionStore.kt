@@ -46,6 +46,8 @@ class SessionStore(private val appContext: Context) {
     // ✅ CurrentUser uchun tezkor getterlar (NON-suspend)
     fun userIdCached(): String? = cachedUserId
     fun accessTokenCached(): String? = cachedAccess
+    fun refreshTokenCached(): String? = cachedRefresh
+
 
     suspend fun userIdOrNull(): String? =
         appContext.dataStore.data.first()[Keys.USER_ID]

@@ -7,6 +7,7 @@ import com.example.yol_yolakay.BuildConfig // Agar qizil bo'lsa, paket nomini te
 import com.example.yol_yolakay.core.session.CurrentUser
 import com.example.yol_yolakay.core.session.SessionStore
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -18,12 +19,17 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodedPath
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.runBlocking
+import io.ktor.client.call.body
+
 
 object BackendClient {
 
@@ -79,16 +85,42 @@ object BackendClient {
             bearer {
                 loadTokens {
                     val tokens = sessionStore.bearerTokensOrNull()
-                    if (tokens != null) {
-                        BearerTokens(tokens.accessToken, tokens.refreshToken ?: "")
-                    } else null
+                    if (tokens != null) BearerTokens(tokens.accessToken, tokens.refreshToken ?: "")
+                    else null
                 }
+
+                refreshTokens {
+                    val refresh = sessionStore.refreshTokenCached()
+                    if (refresh.isNullOrBlank()) return@refreshTokens null
+
+                    // refresh endpointga bearer yuborilmaydi (sendWithoutRequest /auth/ ni skip qiladi)
+                    val resp = client.post("api/auth/refresh") {
+                        contentType(ContentType.Application.Json)
+                        setBody(mapOf("refresh_token" to refresh))
+                    }
+
+                    if (!resp.status.isSuccess()) {
+                        // refresh ishlamasa sessionni tozalaymiz — bu aniq va nazoratli
+                        sessionStore.clear()
+                        android.util.Log.e("HttpClient", "Unauthorized -> NOT clearing session here", Throwable())
+
+                    }
+
+                    val body = resp.body<com.example.yol_yolakay.feature.auth.AuthRemoteRepository.AuthResponse>()
+                    val newAccess = body.token ?: return@refreshTokens null
+                    val newRefresh = body.refreshToken ?: refresh
+
+                    sessionStore.save(newAccess, newRefresh, body.userId)
+
+                    BearerTokens(newAccess, newRefresh)
+                }
+
                 sendWithoutRequest { req ->
-                    // auth endpointlarga bearer yubormaymiz
                     !req.url.encodedPath.contains("/auth/")
                 }
             }
         }
+
 
         defaultRequest {
             url(BASE_URL)
@@ -99,7 +131,9 @@ object BackendClient {
             // Yoki yaxshirog'i: Headerga ID ni har bir requestda dinamik qo'shamiz.
 
             // Guest/Device ID
+            header("X-Client-Id", CurrentUser.id(appContext))   // ✅ login bo‘lsa uid, bo‘lmasa deviceId
             header("X-Device-Id", CurrentUser.deviceId(appContext))
+
 
         }
     }

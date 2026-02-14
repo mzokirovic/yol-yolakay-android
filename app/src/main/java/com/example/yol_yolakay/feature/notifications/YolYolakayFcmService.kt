@@ -14,6 +14,7 @@ class YolYolakayFcmService : FirebaseMessagingService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+
     override fun onNewToken(token: String) {
         super.onNewToken(token)
 

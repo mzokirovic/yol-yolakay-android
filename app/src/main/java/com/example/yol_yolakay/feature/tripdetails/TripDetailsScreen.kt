@@ -661,7 +661,11 @@ private fun SeatActionBottomSheet(
             }
 
             if (status == "booked" || status == "pending") {
-                val who = seat.holderName?.takeIf { it.isNotBlank() } ?: "Noma’lum yo'lovchi"
+                val who =
+                    seat.holderProfile?.displayName?.takeIf { !it.isNullOrBlank() }
+                        ?: seat.holderName?.takeIf { it.isNotBlank() }
+                        ?: "Noma’lum yo'lovchi"
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
