@@ -18,6 +18,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.YolYolakay">
 
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
+
         <!-- ✅ FCM service -->
         <service
             android:name=".feature.notifications.YolYolakayFcmService"

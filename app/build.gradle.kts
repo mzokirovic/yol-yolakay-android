@@ -19,6 +19,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        manifestPlaceholders["MAPS_API_KEY"] = (project.findProperty("MAPS_API_KEY") as String?) ?: ""
+
     }
 
     buildTypes {
@@ -44,6 +47,11 @@ android {
 }
 
 dependencies {
+
+    // Google Maps (Compose)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.maps.android:maps-compose-utils:4.3.3")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("io.ktor:ktor-client-auth:2.3.12")
