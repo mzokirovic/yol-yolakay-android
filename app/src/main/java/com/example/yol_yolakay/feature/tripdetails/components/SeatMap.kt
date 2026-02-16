@@ -209,11 +209,7 @@ private fun SeatCard(
     // ✅ CLICK RULES:
     // - uiLocked bo‘lsa: driver bosishi mumkin; yo‘lovchi faqat o‘z joyini (MINE_BOOKED) bosadi (read-only sheet)
     // - normal: driver hammasini bosadi; yo‘lovchi available/pending/mine_booked bosadi
-    val clickable = when {
-        uiLocked -> isDriver || ui == SeatUiStatus.MINE_BOOKED
-        isDriver -> true
-        else -> ui == SeatUiStatus.AVAILABLE || ui == SeatUiStatus.PENDING || ui == SeatUiStatus.MINE_BOOKED
-    }
+    val clickable = seat != null
 
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
