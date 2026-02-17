@@ -71,7 +71,7 @@ class PublishViewModel : ViewModel() {
         val cur = _uiState.value.currentStep.ordinal
         if (cur < steps.lastIndex) {
             val next = steps[cur + 1]
-            _uiState.update { it.copy(currentStep = next) }
+            _uiState.update { it.copy(currentStep = next, publishError = null) }
             if (next == PublishStep.PRICE) loadPriceSuggestion()
         } else {
             onPublish()
@@ -80,7 +80,12 @@ class PublishViewModel : ViewModel() {
 
     fun onBack() {
         val ord = _uiState.value.currentStep.ordinal
-        if (ord > 0) _uiState.update { it.copy(currentStep = PublishStep.values()[ord - 1]) }
+        if (ord > 0) _uiState.update { it.copy(currentStep = PublishStep.values()[ord - 1], publishError = null) }
+    }
+
+    fun goToStep(step: PublishStep) {
+        _uiState.update { it.copy(currentStep = step, publishError = null) }
+        if (step == PublishStep.PRICE) loadPriceSuggestion()
     }
 
     fun onFromSelected(loc: LocationModel) {
@@ -108,7 +113,15 @@ class PublishViewModel : ViewModel() {
     }
 
     private fun onPublish() {
-        val draft = _uiState.value.draft
+        val state = _uiState.value
+
+        // ✅ Global validation (PREVIEW’da ham vaqt o‘tib ketishi mumkin)
+        state.publishValidationMessage?.let { msg ->
+            _uiState.update { it.copy(publishError = msg, isPublishing = false) }
+            return
+        }
+
+        val draft = state.draft
         val from = draft.fromLocation ?: return
         val to = draft.toLocation ?: return
 
@@ -138,7 +151,9 @@ class PublishViewModel : ViewModel() {
 
             repository.publishTrip(req)
                 .onSuccess { _uiState.update { it.copy(isPublishing = false, isPublished = true) } }
-                .onFailure { e -> _uiState.update { it.copy(isPublishing = false, publishError = e.message ?: "Xatolik") } }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isPublishing = false, publishError = e.message ?: "Xatolik") }
+                }
         }
     }
 

@@ -6,26 +6,54 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -48,7 +76,6 @@ private val UZ_REGIONS = listOf(
     "Surxondaryo",
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegionSelectorField(
     placeholder: String,
@@ -57,32 +84,52 @@ fun RegionSelectorField(
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showDialog by remember { mutableStateOf(false) }
+    val cs = MaterialTheme.colorScheme
+    var showSheet by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            placeholder = { Text(placeholder) },
-            leadingIcon = { Icon(Icons.Default.Place, null) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
-            ),
-            singleLine = true
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { showSheet = true },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Place,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
         )
-        Box(Modifier.matchParentSize().clickable { showDialog = true })
+        Spacer(Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = placeholder,
+                style = MaterialTheme.typography.labelSmall,
+                color = cs.onSurfaceVariant
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = if (value.isBlank()) "Tanlang" else value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (value.isBlank()) cs.onSurfaceVariant else cs.onSurface
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowRight,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant
+        )
     }
 
-    if (showDialog) {
-        RegionSelectionDialog(
+    if (showSheet) {
+        RegionSelectionSheet(
             enableCurrentLocation = enableCurrentLocation,
-            onDismiss = { showDialog = false },
+            onDismiss = { showSheet = false },
             onSelected = {
                 onSelected(it)
-                showDialog = false
+                showSheet = false
             }
         )
     }
@@ -90,17 +137,20 @@ fun RegionSelectorField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RegionSelectionDialog(
+private fun RegionSelectionSheet(
     enableCurrentLocation: Boolean,
     onDismiss: () -> Unit,
     onSelected: (String) -> Unit
 ) {
-    val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
 
     var searchText by remember { mutableStateOf("") }
     var isResolving by remember { mutableStateOf(false) }
-    val snackbar = remember { SnackbarHostState() }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val requestPerm = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -124,98 +174,162 @@ private fun RegionSelectionDialog(
         }
     }
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = cs.surface
     ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Hududni tanlang") },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = null)
-                        }
-                    }
-                )
-            },
-            snackbarHost = { SnackbarHost(snackbar) }
-        ) { padding ->
-            Column(
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // Header
+            Row(
                 modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = searchText,
-                    onValueChange = { searchText = it },
-                    placeholder = { Text("Qidirish (masalan: Samarqand)") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    singleLine = true
+                Text(
+                    text = "Hududni tanlang",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    color = cs.onSurface
                 )
-
-                if (isResolving) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Yopish")
                 }
+            }
 
-                val filtered = remember(searchText) {
-                    val q = searchText.trim()
-                    if (q.isBlank()) UZ_REGIONS
-                    else UZ_REGIONS.filter { it.contains(q, ignoreCase = true) }
-                }
+            // Search
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = { Text("Qidirish (masalan: Samarqand)") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = cs.outlineVariant,
+                    unfocusedBorderColor = cs.outlineVariant,
+                    focusedContainerColor = cs.surfaceVariant.copy(alpha = 0.40f),
+                    unfocusedContainerColor = cs.surfaceVariant.copy(alpha = 0.32f)
+                )
+            )
 
-                LazyColumn(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(10.dp))
 
-                    if (enableCurrentLocation) {
-                        item {
-                            ListItem(
-                                headlineContent = { Text("Joriy joylashuv (Use current location)") },
-                                leadingContent = { Icon(Icons.Default.MyLocation, null) },
-                                modifier = Modifier.clickable(enabled = !isResolving) {
-                                    val hasPerm =
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        ) == PackageManager.PERMISSION_GRANTED ||
-                                                ContextCompat.checkSelfPermission(
-                                                    context,
+            if (isResolving) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+
+            SnackbarHost(hostState = snackbar)
+
+            val filtered = remember(searchText) {
+                val q = searchText.trim()
+                if (q.isBlank()) UZ_REGIONS
+                else UZ_REGIONS.filter { it.contains(q, ignoreCase = true) }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+            ) {
+                if (enableCurrentLocation) {
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = cs.surfaceVariant.copy(alpha = 0.40f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !isResolving) {
+                                        val hasPerm =
+                                            ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            ) == PackageManager.PERMISSION_GRANTED ||
+                                                    ContextCompat.checkSelfPermission(
+                                                        context,
+                                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                                    ) == PackageManager.PERMISSION_GRANTED
+
+                                        if (hasPerm) {
+                                            scope.launch {
+                                                isResolving = true
+                                                val region = resolveRegionFromCurrentLocation(context)
+                                                isResolving = false
+
+                                                val normalized = region?.let { normalizeRegion(it) }
+                                                if (normalized != null) onSelected(normalized)
+                                                else snackbar.showSnackbar("Joriy joylashuvdan viloyat aniqlanmadi")
+                                            }
+                                        } else {
+                                            requestPerm.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION,
                                                     Manifest.permission.ACCESS_FINE_LOCATION
-                                                ) == PackageManager.PERMISSION_GRANTED
-
-                                    if (hasPerm) {
-                                        scope.launch {
-                                            isResolving = true
-                                            val region = resolveRegionFromCurrentLocation(context)
-                                            isResolving = false
-
-                                            val normalized = region?.let { normalizeRegion(it) }
-                                            if (normalized != null) onSelected(normalized)
-                                            else snackbar.showSnackbar("Joriy joylashuvdan viloyat aniqlanmadi")
-                                        }
-                                    } else {
-                                        requestPerm.launch(
-                                            arrayOf(
-                                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                                Manifest.permission.ACCESS_FINE_LOCATION
+                                                )
                                             )
-                                        )
+                                        }
                                     }
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.MyLocation, null, tint = cs.primary)
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "Joriy joylashuv",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = cs.onSurface
+                                    )
+                                    Text(
+                                        "GPS orqali aniqlash",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = cs.onSurfaceVariant
+                                    )
                                 }
-                            )
-                            HorizontalDivider()
+                                Icon(Icons.Default.KeyboardArrowRight, null, tint = cs.onSurfaceVariant)
+                            }
                         }
                     }
 
-                    items(filtered) { region ->
-                        ListItem(
-                            headlineContent = { Text(region) },
-                            modifier = Modifier.clickable { onSelected(region) }
+                    item {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = cs.outlineVariant.copy(alpha = 0.7f)
                         )
-                        HorizontalDivider()
                     }
+                }
+
+                items(filtered) { region ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelected(region) }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = region,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = cs.onSurfaceVariant)
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = cs.outlineVariant.copy(alpha = 0.7f)
+                    )
                 }
             }
         }
@@ -237,19 +351,14 @@ private suspend fun resolveRegionFromCurrentLocation(context: Context): String? 
     ).maxByOrNull { it.time } ?: return@withContext null
 
     val geocoder = Geocoder(context, Locale.getDefault())
-    val addresses = runCatching { geocoder.getFromLocation(loc.latitude, loc.longitude, 1) }
-        .getOrNull()
-
+    val addresses = runCatching { geocoder.getFromLocation(loc.latitude, loc.longitude, 1) }.getOrNull()
     val a = addresses?.firstOrNull() ?: return@withContext null
 
-    // AdminArea ko‘pincha viloyat/regionni beradi, ba’zida subAdminArea ham kerak bo‘ladi
     return@withContext a.adminArea ?: a.subAdminArea ?: a.locality
 }
 
 private fun normalizeRegion(raw: String): String? {
     val s = raw.lowercase(Locale.getDefault())
-
-    // Uzbek/Rus/Eng bo'lishi mumkin — eng ko‘p uchraydigan mapping
     return when {
         s.contains("toshkent") || s.contains("ташкент") || s.contains("tashkent") -> "Toshkent"
         s.contains("andijon") || s.contains("андижан") || s.contains("andijan") -> "Andijon"

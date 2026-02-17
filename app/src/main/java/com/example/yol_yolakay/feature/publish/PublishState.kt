@@ -48,7 +48,7 @@ data class PublishUiState(
     val publishError: String? = null,
     val isPublished: Boolean = false
 ) {
-    // ---------- UI helpers (M3) ----------
+    // ---------- UI helpers ----------
     val progress: Float
         get() = (currentStep.ordinal + 1) / PublishStep.values().size.toFloat()
 
@@ -64,7 +64,6 @@ data class PublishUiState(
 
     private fun sameLocation(a: LocationModel?, b: LocationModel?): Boolean {
         if (a == null || b == null) return false
-        // pointId bo'lsa shuni ishlatamiz, bo'lmasa name bilan solishtiramiz
         val idA = a.pointId?.trim()
         val idB = b.pointId?.trim()
         return when {
@@ -81,7 +80,6 @@ data class PublishUiState(
 
     private val isTimeValid: Boolean
         get() = if (draft.date == LocalDate.now()) {
-            // bugungi kunda o‘tib ketgan vaqt bo‘lmasin
             !draft.time.isBefore(LocalTime.now().minusMinutes(1))
         } else true
 
@@ -101,7 +99,7 @@ data class PublishUiState(
             return true
         }
 
-    // ✅ UI uchun: qaysi joyda nima xato ekanini aniq aytib beradigan message
+    // ✅ Qadamga mos message (UI guidance)
     val validationMessage: String?
         get() = when (currentStep) {
             PublishStep.FROM -> if (from == null) "Jo‘nash manzilini tanlang." else null
@@ -122,7 +120,22 @@ data class PublishUiState(
             PublishStep.PREVIEW -> null
         }
 
-    // ✅ Button enable: endi faqat “bor/yo‘q” emas, real validatsiya
+    // ✅ PREVIEW uchun ham real publish-validatsiya (finish fix)
+    val publishValidationMessage: String?
+        get() = when {
+            from == null -> "Jo‘nash manzilini tanlang."
+            to == null -> "Manzilni tanlang."
+            !isRouteValid -> "Jo‘nash va manzil bir xil bo‘lishi mumkin emas."
+            !isDateValid -> "O‘tib ketgan sanani tanlab bo‘lmaydi."
+            !isTimeValid -> "O‘tib ketgan vaqtga e’lon berib bo‘lmaydi."
+            !isPassengersValid -> "Yo‘lovchi joyi 1..4 bo‘lishi kerak."
+            priceValue == null -> "Narxni kiriting."
+            priceSuggestion.hasRange && !isPriceValid ->
+                "Narx ${priceSuggestion.minLong}..${priceSuggestion.maxLong} oralig‘ida bo‘lishi kerak."
+            else -> null
+        }
+
+    // ✅ Button enable: endi PREVIEW ham to‘liq tekshiradi
     val isNextEnabled: Boolean
         get() = when (currentStep) {
             PublishStep.FROM -> from != null
@@ -131,7 +144,7 @@ data class PublishUiState(
             PublishStep.TIME -> isTimeValid
             PublishStep.PASSENGERS -> isPassengersValid
             PublishStep.PRICE -> isPriceValid
-            PublishStep.PREVIEW -> true
+            PublishStep.PREVIEW -> publishValidationMessage == null
         }
 }
 
@@ -140,7 +153,7 @@ data class PublishUiState(
  */
 private fun defaultTime(): LocalTime {
     val t = LocalTime.now().plusMinutes(15)
-    val roundedMinute = ((t.minute + 4) / 5) * 5 // 0..59
+    val roundedMinute = ((t.minute + 4) / 5) * 5
     val safeMinute = if (roundedMinute == 60) 0 else roundedMinute
     val hour = if (roundedMinute == 60) (t.hour + 1) % 24 else t.hour
     return LocalTime.of(hour, safeMinute).truncatedTo(ChronoUnit.MINUTES)

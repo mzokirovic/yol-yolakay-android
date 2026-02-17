@@ -1,18 +1,24 @@
 package com.example.yol_yolakay.main
 
+import android.net.http.SslCertificate.restoreState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import androidx.navigation.toRoute
 import com.example.yol_yolakay.AppDeepLink
@@ -29,10 +35,11 @@ import com.example.yol_yolakay.feature.tripdetails.TripDetailsScreen
 import com.example.yol_yolakay.feature.trips.MyTripsScreen
 import com.example.yol_yolakay.navigation.Screen
 
-data class BottomNavItem(
+private data class BottomNavItem(
     val name: String,
     val route: Any,
-    val icon: ImageVector
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
 )
 
 @Composable
@@ -43,17 +50,15 @@ fun MainScreen(
     val navController = rememberNavController()
     val ctx = LocalContext.current
 
-    // ✅ 1) Notifications VM (MainScreen oldin ham shunday ishlagan)
+    // ✅ Notifications VM
     val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
 
-    // ✅ 2) Login state ni notifVm'ga uzatamiz (real-app behavior)
+    // ✅ Login state -> notifVm
     val sessionStore = remember { SessionStore(ctx.applicationContext) }
     val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
-    LaunchedEffect(isLoggedIn) {
-        notifVm.onLoginState(isLoggedIn)
-    }
+    LaunchedEffect(isLoggedIn) { notifVm.onLoginState(isLoggedIn) }
 
-    // ✅ unreadCount (compose reactive bo'ladi, notifVm.state mutableState)
+    // ✅ unreadCount
     val unreadCount = notifVm.state.unreadCount
 
     // Updates tab ochish uchun signal
@@ -62,7 +67,7 @@ fun MainScreen(
     // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Notification bosilganda navigation
+    // Deep link navigation
     LaunchedEffect(deepLink) {
         val dl = deepLink ?: return@LaunchedEffect
 
@@ -88,65 +93,25 @@ fun MainScreen(
         onDeepLinkHandled()
     }
 
-    val bottomNavItems = listOf(
-        BottomNavItem("Qidiruv", Screen.Search, Icons.Default.Search),
-        BottomNavItem("E'lon", Screen.Publish, Icons.Default.AddCircle),
-        BottomNavItem("Safarlar", Screen.MyTrips, Icons.Default.DateRange),
-        BottomNavItem("Inbox", Screen.Inbox, Icons.Default.Email),
-        BottomNavItem("Profil", Screen.Profile, Icons.Default.Person)
-    )
+    // ✅ Clean bottom tabs (Filled vs Outlined)
+    val bottomNavItems = remember {
+        listOf(
+            BottomNavItem("Qidiruv", Screen.Search, Icons.Filled.Search, Icons.Outlined.Search),
+            BottomNavItem("E'lon", Screen.Publish, Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
+            BottomNavItem("Safarlar", Screen.MyTrips, Icons.Filled.DateRange, Icons.Outlined.DateRange),
+            BottomNavItem("Inbox", Screen.Inbox, Icons.Filled.Email, Icons.Outlined.Email),
+            BottomNavItem("Profil", Screen.Profile, Icons.Filled.Person, Icons.Outlined.Person),
+        )
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDest = navBackStackEntry?.destination
-
-                bottomNavItems.forEach { item ->
-                    val isSelected = when (item.route) {
-                        Screen.Profile -> {
-                            currentDest?.hierarchy?.any { dest ->
-                                dest.hasRoute(Screen.Profile::class) ||
-                                        dest.hasRoute(Screen.ProfileEdit::class) ||
-                                        dest.hasRoute(Screen.Vehicle::class) ||
-                                        dest.hasRoute(Screen.Language::class) ||
-                                        dest.hasRoute(Screen.PaymentMethods::class)
-                            } == true
-                        }
-                        Screen.Inbox -> {
-                            currentDest?.hierarchy?.any { dest ->
-                                dest.hasRoute(Screen.Inbox::class) ||
-                                        dest.hasRoute(Screen.Thread::class)
-                            } == true
-                        }
-                        else -> currentDest?.hierarchy?.any { it.hasRoute(item.route::class) } == true
-                    }
-
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        label = { Text(item.name) },
-                        icon = {
-                            if (item.route == Screen.Inbox && unreadCount > 0) {
-                                BadgedBox(badge = { Badge { Text(unreadCount.toString()) } }) {
-                                    Icon(item.icon, contentDescription = item.name)
-                                }
-                            } else {
-                                Icon(item.icon, contentDescription = item.name)
-                            }
-                        }
-                    )
-                }
-            }
+            MainBottomBar(
+                navController = navController,
+                items = bottomNavItems,
+                unreadCount = unreadCount
+            )
         }
     ) { innerPadding ->
 
@@ -230,3 +195,76 @@ fun MainScreen(
         }
     }
 }
+
+@Composable
+private fun MainBottomBar(
+    navController: NavHostController,
+    items: List<BottomNavItem>,
+    unreadCount: Int
+) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDest = navBackStackEntry?.destination
+    val cs = MaterialTheme.colorScheme
+
+    Surface(color = cs.surface, shadowElevation = 6.dp) {
+        NavigationBar(
+            containerColor = cs.surface,
+            tonalElevation = 0.dp
+        ) {
+            items.forEach { item ->
+                val isSelected = when (item.route) {
+                    Screen.Profile -> currentDest.isProfileSection()
+                    Screen.Inbox -> currentDest.isInboxSection()
+                    else -> currentDest.isInHierarchy(item.route)
+                }
+
+                val iconVector = if (isSelected) item.selectedIcon else item.unselectedIcon
+
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = {
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    // ✅ MUHIM: label bermaymiz => icon tepaga ko‘chmaydi
+                    alwaysShowLabel = false,
+                    icon = {
+                        if (item.route == Screen.Inbox && unreadCount > 0) {
+                            BadgedBox(badge = { Badge { Text(unreadCount.toString()) } }) {
+                                Icon(iconVector, contentDescription = item.name)
+                            }
+                        } else {
+                            Icon(iconVector, contentDescription = item.name)
+                        }
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color.Transparent, // pill yo‘q
+                        selectedIconColor = cs.onSurface,
+                        unselectedIconColor = cs.onSurfaceVariant
+                    )
+                )
+            }
+        }
+    }
+}
+
+
+private fun NavDestination?.isInHierarchy(route: Any): Boolean =
+    this?.hierarchy?.any { it.hasRoute(route::class) } == true
+
+private fun NavDestination?.isInboxSection(): Boolean =
+    this?.hierarchy?.any { dest ->
+        dest.hasRoute(Screen.Inbox::class) || dest.hasRoute(Screen.Thread::class)
+    } == true
+
+private fun NavDestination?.isProfileSection(): Boolean =
+    this?.hierarchy?.any { dest ->
+        dest.hasRoute(Screen.Profile::class) ||
+                dest.hasRoute(Screen.ProfileEdit::class) ||
+                dest.hasRoute(Screen.Vehicle::class) ||
+                dest.hasRoute(Screen.Language::class) ||
+                dest.hasRoute(Screen.PaymentMethods::class)
+    } == true

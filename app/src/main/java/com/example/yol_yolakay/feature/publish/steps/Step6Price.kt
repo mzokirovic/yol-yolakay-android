@@ -1,14 +1,15 @@
 package com.example.yol_yolakay.feature.publish.steps
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.example.yol_yolakay.feature.publish.PublishUiState
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.roundToLong
 
 @Composable
 fun Step6Price(
@@ -23,53 +25,73 @@ fun Step6Price(
     onPriceChange: (String) -> Unit,
     onAdjustPrice: (Int) -> Unit
 ) {
-    // ✅ TUZATILDI: Draft ichidan olinmoqda
-    val currentPrice = uiState.draft.price.toDoubleOrNull() ?: 0.0
+    val cs = MaterialTheme.colorScheme
+
+    val currentPriceLong = uiState.draft.price.filter(Char::isDigit).toLongOrNull() ?: 0L
+    val hasRange = uiState.priceSuggestion.hasRange
+    val minL = uiState.priceSuggestion.minLong
+    val maxL = uiState.priceSuggestion.maxLong
+    val recL = uiState.priceSuggestion.recommendedLong
+
+    val decEnabled = if (hasRange) currentPriceLong > minL else currentPriceLong > 5000L
+    val incEnabled = if (hasRange) currentPriceLong < maxL else true
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Bir kishi uchun narx",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ✅ TUZATILDI: PriceSuggestion ichidan olinmoqda
+        // Distance + recommended
         if (uiState.priceSuggestion.isLoading) {
             CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Masofa o'lchanmoqda...", color = Color.Gray)
+            Spacer(Modifier.height(8.dp))
+            Text("Masofa o'lchanmoqda...", color = cs.onSurfaceVariant)
         } else {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = cs.surfaceVariant.copy(alpha = 0.55f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        // ✅ TUZATILDI: PriceSuggestion
                         text = "Masofa: ${uiState.priceSuggestion.distanceKm} km",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        color = cs.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        // ✅ TUZATILDI: PriceSuggestion
-                        text = "Tavsiya: ${formatMoney(uiState.priceSuggestion.recommended)} so'm",
+                        text = "Tavsiya: ${formatMoney(recL)} so‘m",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = cs.primary
                     )
+                    if (hasRange) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "Oraliq: ${formatMoney(minL)} .. ${formatMoney(maxL)} so‘m",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = cs.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(Modifier.height(26.dp))
 
-        // CONTROL
+        // Controls
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
@@ -77,72 +99,71 @@ fun Step6Price(
         ) {
             FilledTonalIconButton(
                 onClick = { onAdjustPrice(-5000) },
-                modifier = Modifier.size(56.dp),
-                // ✅ TUZATILDI: PriceSuggestion
-                enabled = currentPrice > uiState.priceSuggestion.min
+                enabled = decEnabled,
+                modifier = Modifier.size(56.dp)
             ) {
-                Text("-", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.Remove, contentDescription = "Kamaytirish")
             }
 
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(Modifier.width(20.dp))
 
             Text(
-                text = formatMoney(currentPrice),
+                text = formatMoney(currentPriceLong),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = cs.onSurface
             )
 
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(Modifier.width(20.dp))
 
             FilledTonalIconButton(
                 onClick = { onAdjustPrice(5000) },
-                modifier = Modifier.size(56.dp),
-                // ✅ TUZATILDI: PriceSuggestion
-                enabled = currentPrice < uiState.priceSuggestion.max
+                enabled = incEnabled,
+                modifier = Modifier.size(56.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Oshirish", modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.Add, contentDescription = "Oshirish")
             }
         }
 
-        Text("so'm", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
+        Text("so‘m", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // WARNINGS
-        // ✅ TUZATILDI: PriceSuggestion va isLoading
-        if (currentPrice > 0 && !uiState.priceSuggestion.isLoading) {
-            val rec = uiState.priceSuggestion.recommended
+        // Warnings (theme colors)
+        if (currentPriceLong > 0 && !uiState.priceSuggestion.isLoading && recL > 0) {
+            val low = (recL * 0.7).roundToLong()
+            val high = (recL * 1.5).roundToLong()
+
             when {
-                // Nolga bo'linish xavfini oldini olish
-                rec > 0 && currentPrice < rec * 0.7 -> {
-                    WarningCard(
-                        "Narx juda past! Benzin xarajatini qoplamasligi mumkin.",
-                        Color(0xFFFFF3E0), Color(0xFFE65100)
+                currentPriceLong < low -> {
+                    InfoCard(
+                        text = "Narx juda past! Benzin xarajatini qoplamasligi mumkin.",
+                        container = cs.tertiaryContainer,
+                        content = cs.onTertiaryContainer
                     )
                 }
-                rec > 0 && currentPrice > rec * 1.5 -> {
-                    WarningCard(
-                        "Narx juda baland! Yo'lovchi topish qiyin bo'lishi mumkin.",
-                        Color(0xFFFFEBEE), Color(0xFFC62828)
+                currentPriceLong > high -> {
+                    InfoCard(
+                        text = "Narx juda baland! Yo'lovchi topish qiyin bo‘lishi mumkin.",
+                        container = cs.errorContainer,
+                        content = cs.onErrorContainer
                     )
                 }
                 else -> {
-                    Text(
-                        "✅ Narx bozor talablariga mos",
-                        color = Color(0xFF2E7D32),
-                        fontWeight = FontWeight.Medium
+                    InfoCard(
+                        text = "✅ Narx bozor talablariga mos",
+                        container = cs.primaryContainer,
+                        content = cs.onPrimaryContainer
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(Modifier.weight(1f))
 
         OutlinedTextField(
-            // ✅ TUZATILDI: Draft
             value = uiState.draft.price,
-            onValueChange = onPriceChange,
+            onValueChange = { onPriceChange(it.filter(Char::isDigit)) },
             label = { Text("Aniq summa kiritish") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
@@ -152,18 +173,25 @@ fun Step6Price(
 }
 
 @Composable
-fun WarningCard(text: String, bgColor: Color, textColor: Color) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+private fun InfoCard(
+    text: String,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color
+) {
+    Surface(
+        color = container,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("⚠️", modifier = Modifier.padding(end = 8.dp))
-            Text(text = text, color = textColor, style = MaterialTheme.typography.bodyMedium)
-        }
+        Text(
+            text = text,
+            color = content,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(14.dp)
+        )
     }
 }
 
-fun formatMoney(amount: Double): String {
+private fun formatMoney(amount: Long): String {
     return NumberFormat.getNumberInstance(Locale.US).format(amount).replace(",", " ")
 }
