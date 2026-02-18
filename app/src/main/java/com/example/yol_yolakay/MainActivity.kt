@@ -109,18 +109,32 @@ class MainActivity : ComponentActivity() {
 
     private fun parseIntent(i: Intent?): AppDeepLink? {
         if (i == null) return null
+
         val notifId = i.getStringExtra("notification_id")
         val threadId = i.getStringExtra("thread_id")
         val tripId = i.getStringExtra("trip_id")
-        val openUpdates = i.getBooleanExtra("open_updates", false)
+
+        // ✅ agar thread/trip bo‘lsa, open_updates ni majburan false qilamiz (tez yo‘l)
+        val rawOpenUpdates = i.getBooleanExtra("open_updates", false)
+        val openUpdates = if (!threadId.isNullOrBlank() || !tripId.isNullOrBlank()) false else rawOpenUpdates
+
         val title = i.getStringExtra("push_title")
         val body = i.getStringExtra("push_body")
 
         if (notifId.isNullOrBlank() && threadId.isNullOrBlank() && tripId.isNullOrBlank() && !openUpdates) {
             return null
         }
-        return AppDeepLink(notifId, threadId, tripId, openUpdates, title, body)
+
+        return AppDeepLink(
+            notificationId = notifId,
+            threadId = threadId,
+            tripId = tripId,
+            openUpdates = openUpdates,
+            title = title,
+            body = body
+        )
     }
+
 
     private fun markReadBestEffort(notificationId: String?) {
         if (notificationId.isNullOrBlank()) return
@@ -167,6 +181,11 @@ private fun AppRoot(
     val ctx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
+    // ✅ FAST PATH: push bosilganda MainScreen’ni profil check bilan bloklamaymiz
+    val hasFastDeepLink = remember(deepLink) {
+        deepLink?.let { !it.threadId.isNullOrBlank() || !it.tripId.isNullOrBlank() } == true
+    }
+
     // ✅ login bo'lsa: worker + token sync
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -181,30 +200,38 @@ private fun AppRoot(
         }
     }
 
-    // Profilni tekshirish
-    LaunchedEffect(isLoggedIn, authCompleted) {
-        if (isLoggedIn || authCompleted) {
-            profileState = ProfileState.Loading
-            runCatching {
-                val p = ProfileRemoteRepository().getMe()
-                val name = p.displayName?.trim() ?: ""
-                val needs = name.isBlank() || name.equals("Guest", ignoreCase = true)
-                profileState = if (needs) ProfileState.NeedsCompletion else ProfileState.Complete
-            }.onFailure {
-                Log.e("AppRoot", "Profile check failed", it)
-                profileState = ProfileState.Error
-            }
-        } else {
+    // ✅ Profilni tekshirish (oddiy holatda)
+    // Push fast-path bo‘lsa ham bu background’da ketadi, UI bloklanmaydi
+    LaunchedEffect(isLoggedIn) {
+        if (!isLoggedIn) {
             profileState = ProfileState.LoggedOut
+            return@LaunchedEffect
+        }
+
+        profileState = ProfileState.Loading
+        runCatching {
+            val p = ProfileRemoteRepository().getMe()
+            val name = p.displayName?.trim() ?: ""
+            val needs = name.isBlank() || name.equals("Guest", ignoreCase = true)
+            profileState = if (needs) ProfileState.NeedsCompletion else ProfileState.Complete
+        }.onFailure {
+            Log.e("AppRoot", "Profile check failed", it)
+            profileState = ProfileState.Error
         }
     }
 
-    // Deep link handled (UI-level), MainScreen o'zi navigate qiladi
-    LaunchedEffect(deepLink) {
-        // bu yerda hech narsa shart emas, MainScreen ishlatadi
-        // (qolsa ham zarar qilmaydi)
+
+    // ✅ 1) Agar login bo‘lsa va push thread/trip bo‘lsa — darhol MainScreen
+    // (profil Loading bo‘lsa ham)
+    if (isLoggedIn && hasFastDeepLink) {
+        MainScreen(
+            deepLink = deepLink,
+            onDeepLinkHandled = onDeepLinkHandled
+        )
+        return
     }
 
+    // ✅ 2) Oddiy flow (avvalgidek)
     when (profileState) {
         ProfileState.LoggedOut -> {
             AuthScreen(
@@ -228,10 +255,7 @@ private fun AppRoot(
                         Text("Qayta urinish")
                     }
                     Spacer(Modifier.height(16.dp))
-                    TextButton(onClick = {
-                        // ✅ GlobalScope emas
-                        scope.launch { sessionStore.clear() }
-                    }) {
+                    TextButton(onClick = { scope.launch { sessionStore.clear() } }) {
                         Text("Chiqish")
                     }
                 }
@@ -239,6 +263,8 @@ private fun AppRoot(
         }
 
         ProfileState.NeedsCompletion -> {
+            // ✅ Agar push openUpdates bo‘lsa ham (xohlasangiz), profilni keyinroq ham qilish mumkin.
+            // Hozircha oddiy: profil to‘ldirishga olib boramiz.
             CompleteProfileScreen(
                 repo = remember { ProfileRemoteRepository() },
                 onDone = { profileState = ProfileState.Complete }
@@ -253,6 +279,7 @@ private fun AppRoot(
         }
     }
 }
+
 
 enum class ProfileState {
     LoggedOut,
