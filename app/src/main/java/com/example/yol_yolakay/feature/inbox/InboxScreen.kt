@@ -2,16 +2,16 @@ package com.example.yol_yolakay.feature.inbox
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.Icon
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +23,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.network.model.ThreadApiModel
-import com.example.yol_yolakay.core.session.CurrentUser
 import kotlinx.coroutines.launch
 
 data class InboxState(
@@ -40,6 +39,7 @@ class InboxViewModel(private val repo: InboxRemoteRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
+            // Pull refresh paytida ham loading true bo‘ladi
             state = state.copy(isLoading = true, error = null)
             runCatching { repo.listThreads() }
                 .onSuccess { list -> state = state.copy(isLoading = false, threads = list) }
@@ -48,126 +48,202 @@ class InboxViewModel(private val repo: InboxRemoteRepository) : ViewModel() {
     }
 
     companion object {
-        fun factory(context: android.content.Context): ViewModelProvider.Factory =
+        fun factory(): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    // 🚨 Argument olib tashlandi
                     return InboxViewModel(InboxRemoteRepository()) as T
                 }
             }
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun InboxScreen(
     onOpenThread: (String) -> Unit,
-    vm: InboxViewModel = viewModel(factory = InboxViewModel.factory(LocalContext.current))
+    vm: InboxViewModel = viewModel(factory = InboxViewModel.factory())
 ) {
     val s = vm.state
 
-    Column(
+    // ✅ Pull-to-refresh state
+    val pullState = rememberPullRefreshState(
+        refreshing = s.isLoading,
+        onRefresh = { vm.refresh() }
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .pullRefresh(pullState)
     ) {
-        TopHeader(title = "Xabarlar", onRefresh = { vm.refresh() })
 
-        Spacer(Modifier.height(12.dp))
-
-        if (s.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            return
-        }
-
-        // ✅ Error bo‘lsa: faqat error + retry, pastdagi empty-state chiqmaydi
-        if (s.error != null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(s.error!!, color = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.height(10.dp))
-                    androidx.compose.material3.Button(onClick = { vm.refresh() }) {
-                        Text("Qayta urinish")
-                    }
-                }
-            }
-            return
-        }
-
-        if (s.threads.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Hali chatlar yo‘q")
-            }
-            return
-        }
-
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
         ) {
-            Column {
-                s.threads.forEachIndexed { index, t ->
-                    ThreadRow(
-                        title = t.otherUserName ?: t.otherUserId,
-                        subtitle = t.lastMessage ?: "Xabar yo‘q",
-                        onClick = { onOpenThread(t.id) }
+            // ✅ Header — refresh tugmasiz
+            Text(
+                text = "Chatlar",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            when {
+                s.error != null -> {
+                    ErrorState(
+                        message = s.error!!,
+                        onRetry = { vm.refresh() }
                     )
-                    if (index != s.threads.lastIndex) {
-                        DividerIndented()
-                    }
                 }
+
+                !s.isLoading && s.threads.isEmpty() -> {
+                    EmptyState(
+                        title = "Hali chatlar yo‘q",
+                        subtitle = "Safar e’lonlaridan chat boshlang — hammasi shu yerda ko‘rinadi."
+                    )
+                }
+
+                else -> {
+                    ThreadsList(
+                        threads = s.threads,
+                        onOpenThread = onOpenThread
+                    )
+                }
+            }
+        }
+
+        // ✅ Indicator (tepa markazda)
+        PullRefreshIndicator(
+            refreshing = s.isLoading,
+            state = pullState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ThreadsList(
+    threads: List<ThreadApiModel>,
+    onOpenThread: (String) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(vertical = 6.dp)
+        ) {
+            items(threads, key = { it.id }) { t ->
+                ThreadRowModern(
+                    title = t.otherUserName ?: (t.otherUserId ?: "Foydalanuvchi"),
+                    subtitle = t.lastMessage ?: "Xabar yo‘q",
+                    onClick = { onOpenThread(t.id) }
+                )
+                Divider(
+                    thickness = 1.dp,
+                    color = cs.outline.copy(alpha = 0.10f),
+                    modifier = Modifier.padding(start = 72.dp)
+                )
             }
         }
     }
 }
 
-
 @Composable
-private fun TopHeader(title: String, onRefresh: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-        }
-    }
-}
+private fun ThreadRowModern(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
 
-@Composable
-private fun ThreadRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(2.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Avatar circle (text-based)
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = cs.primaryContainer
+        ) {
+            Box(
+                modifier = Modifier.size(46.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title.trim().take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = cs.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
-        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun DividerIndented() {
-    androidx.compose.material3.Divider(
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-        modifier = Modifier.padding(start = 14.dp)
-    )
+private fun EmptyState(title: String, subtitle: String) {
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(message, color = cs.error, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onRetry) { Text("Qayta urinish") }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Yuqoridan pastga tortib ham yangilashingiz mumkin.",
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant
+            )
+        }
+    }
 }

@@ -25,12 +25,19 @@ class AuthRemoteRepository(private val client: HttpClient) {
     @Serializable
     data class AuthResponse(
         @SerialName("success") val success: Boolean = true,
-        @SerialName("access_token") val token: String? = null, // Backendda "token" yoki "access_token" kelishi mumkin
+
+        // backend: access_token yuborsa shu tushadi
+        @SerialName("access_token") val accessToken: String? = null,
+
+        // backend: token yuborsa shu tushadi
+        @SerialName("token") val token: String? = null,
+
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("user_id") val userId: String? = null,
         @SerialName("is_new_user") val isNewUser: Boolean = false,
         @SerialName("message") val message: String? = null
     )
+
 
     suspend fun sendOtp(phone: String) {
         // 1. Xavfsizlik: Agar "+" belgisi bo'lmasa, majburan qo'shamiz
