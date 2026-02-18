@@ -1,13 +1,38 @@
 package com.example.yol_yolakay.main
 
-import android.net.http.SslCertificate.restoreState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -19,7 +44,10 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.example.yol_yolakay.AppDeepLink
 import com.example.yol_yolakay.core.session.SessionStore
@@ -27,13 +55,18 @@ import com.example.yol_yolakay.feature.inbox.InboxHubScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
-import com.example.yol_yolakay.feature.profile.*
+import com.example.yol_yolakay.feature.profile.LanguageScreen
+import com.example.yol_yolakay.feature.profile.PaymentMethodsScreen
+import com.example.yol_yolakay.feature.profile.ProfileEditScreen
+import com.example.yol_yolakay.feature.profile.ProfileScreen
+import com.example.yol_yolakay.feature.profile.VehicleScreen
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.search.SearchScreen
 import com.example.yol_yolakay.feature.search.TripListScreen
 import com.example.yol_yolakay.feature.tripdetails.TripDetailsScreen
 import com.example.yol_yolakay.feature.trips.MyTripsScreen
 import com.example.yol_yolakay.navigation.Screen
+import kotlinx.coroutines.launch
 
 private data class BottomNavItem(
     val name: String,
@@ -61,11 +94,12 @@ fun MainScreen(
     // ✅ unreadCount
     val unreadCount = notifVm.state.unreadCount
 
-    // Updates tab ochish uchun signal
-    var openUpdatesSignal by rememberSaveable { mutableIntStateOf(0) }
+    // ✅ Compose versiya mosligi uchun: MutableIntState emas, oddiy Int state
+    var openUpdatesSignal by rememberSaveable { mutableStateOf(0) }
 
     // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Deep link navigation
     LaunchedEffect(deepLink) {
@@ -75,7 +109,7 @@ fun MainScreen(
         val b = dl.body?.trim().orEmpty()
         if (t.isNotBlank() || b.isNotBlank()) {
             val msg = if (t.isNotBlank() && b.isNotBlank()) "$t — $b" else (t.ifBlank { b })
-            snackbarHostState.showSnackbar(message = msg)
+            scope.launch { snackbarHostState.showSnackbar(message = msg) }
         }
 
         when {
@@ -93,7 +127,6 @@ fun MainScreen(
         onDeepLinkHandled()
     }
 
-    // ✅ Clean bottom tabs (Filled vs Outlined)
     val bottomNavItems = remember {
         listOf(
             BottomNavItem("Qidiruv", Screen.Search, Icons.Filled.Search, Icons.Outlined.Search),
@@ -114,7 +147,6 @@ fun MainScreen(
             )
         }
     ) { innerPadding ->
-
         NavHost(
             navController = navController,
             startDestination = Screen.Search,
@@ -206,7 +238,7 @@ private fun MainBottomBar(
     val currentDest = navBackStackEntry?.destination
     val cs = MaterialTheme.colorScheme
 
-    Surface(color = cs.surface, shadowElevation = 6.dp) {
+    Surface(color = cs.surface, shadowElevation = 10.dp) {
         NavigationBar(
             containerColor = cs.surface,
             tonalElevation = 0.dp
@@ -219,6 +251,11 @@ private fun MainBottomBar(
                 }
 
                 val iconVector = if (isSelected) item.selectedIcon else item.unselectedIcon
+                val badgeText = when {
+                    unreadCount <= 0 -> null
+                    unreadCount > 99 -> "99+"
+                    else -> unreadCount.toString()
+                }
 
                 NavigationBarItem(
                     selected = isSelected,
@@ -229,11 +266,10 @@ private fun MainBottomBar(
                             restoreState = true
                         }
                     },
-                    // ✅ MUHIM: label bermaymiz => icon tepaga ko‘chmaydi
                     alwaysShowLabel = false,
                     icon = {
-                        if (item.route == Screen.Inbox && unreadCount > 0) {
-                            BadgedBox(badge = { Badge { Text(unreadCount.toString()) } }) {
+                        if (item.route == Screen.Inbox && badgeText != null) {
+                            BadgedBox(badge = { Badge { Text(badgeText) } }) {
                                 Icon(iconVector, contentDescription = item.name)
                             }
                         } else {
@@ -241,7 +277,7 @@ private fun MainBottomBar(
                         }
                     },
                     colors = NavigationBarItemDefaults.colors(
-                        indicatorColor = Color.Transparent, // pill yo‘q
+                        indicatorColor = Color.Transparent,
                         selectedIconColor = cs.onSurface,
                         unselectedIconColor = cs.onSurfaceVariant
                     )
@@ -250,7 +286,6 @@ private fun MainBottomBar(
         }
     }
 }
-
 
 private fun NavDestination?.isInHierarchy(route: Any): Boolean =
     this?.hierarchy?.any { it.hasRoute(route::class) } == true

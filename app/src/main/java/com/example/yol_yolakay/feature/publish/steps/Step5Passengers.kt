@@ -26,7 +26,7 @@ fun Step5Passengers(
 ) {
     val cs = MaterialTheme.colorScheme
     val min = 1
-    val max = 4 // ✅ FIX
+    val max = 4
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -43,7 +43,7 @@ fun Step5Passengers(
             color = cs.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
 
         Surface(
             shape = RoundedCornerShape(22.dp),
@@ -57,29 +57,45 @@ fun Step5Passengers(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StepCounterButton(
+                CounterIconButton(
                     enabled = count > min,
                     onClick = { onCountChange((count - 1).coerceAtLeast(min)) }
                 ) { Icon(Icons.Rounded.Remove, null) }
 
-                Text(
-                    text = count.toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = cs.onSurface
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = cs.onSurface
+                    )
+                    Text(
+                        text = if (count == 1) "o‘rin" else "o‘rin",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = cs.onSurfaceVariant
+                    )
+                }
 
-                StepCounterButton(
+                CounterIconButton(
                     enabled = count < max,
                     onClick = { onCountChange((count + 1).coerceAtMost(max)) }
                 ) { Icon(Icons.Rounded.Add, null) }
             }
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ✅ kichik helper text (UX)
+        Text(
+            text = "Haydovchi o‘rni hisoblanmaydi",
+            style = MaterialTheme.typography.bodySmall,
+            color = cs.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun StepCounterButton(
+private fun CounterIconButton(
     enabled: Boolean,
     onClick: () -> Unit,
     content: @Composable () -> Unit
@@ -93,7 +109,7 @@ private fun StepCounterButton(
 
     Surface(
         modifier = Modifier
-            .size(46.dp)
+            .size(48.dp)
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },

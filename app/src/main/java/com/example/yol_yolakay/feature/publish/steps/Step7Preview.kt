@@ -2,7 +2,9 @@ package com.example.yol_yolakay.feature.publish.steps
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -13,15 +15,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.yol_yolakay.feature.publish.PublishStep
 import com.example.yol_yolakay.feature.publish.PublishUiState
+import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun Step7Preview(
     uiState: PublishUiState,
     onEditStep: (PublishStep) -> Unit
 ) {
+    val scroll = rememberScrollState()
+
+    val dateText = uiState.draft.date.format(DateTimeFormatter.ISO_DATE)
+    val timeText = uiState.draft.time.format(DateTimeFormatter.ofPattern("HH:mm"))
+
+    val priceLong = uiState.draft.price.filter(Char::isDigit).toLongOrNull() ?: 0L
+    val priceText = if (priceLong > 0) "${formatMoney(priceLong)} so‘m" else "Kiritilmagan"
+
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
@@ -36,18 +50,12 @@ fun Step7Preview(
         PreviewRow("Qayerga", uiState.draft.toLocation?.name ?: "Tanlanmagan") {
             onEditStep(PublishStep.TO)
         }
-        PreviewRow("Sana", uiState.draft.date.format(DateTimeFormatter.ISO_DATE)) {
-            onEditStep(PublishStep.DATE)
-        }
-        PreviewRow("Vaqt", uiState.draft.time.format(DateTimeFormatter.ofPattern("HH:mm"))) {
-            onEditStep(PublishStep.TIME)
-        }
-        PreviewRow("Yo'lovchilar", "${uiState.draft.passengers} kishi") {
-            onEditStep(PublishStep.PASSENGERS)
-        }
-        PreviewRow("Narx", "${uiState.draft.price} so'm") {
-            onEditStep(PublishStep.PRICE)
-        }
+        PreviewRow("Sana", dateText) { onEditStep(PublishStep.DATE) }
+        PreviewRow("Vaqt", timeText) { onEditStep(PublishStep.TIME) }
+        PreviewRow("Yo'lovchilar", "${uiState.draft.passengers} o‘rin") { onEditStep(PublishStep.PASSENGERS) }
+        PreviewRow("Narx", priceText) { onEditStep(PublishStep.PRICE) }
+
+        Spacer(Modifier.height(20.dp)) // ✅ pastda nafas
     }
 }
 
@@ -76,4 +84,8 @@ private fun PreviewRow(
             Icon(Icons.Default.Edit, contentDescription = "Tahrirlash", tint = cs.primary)
         }
     }
+}
+
+private fun formatMoney(amount: Long): String {
+    return NumberFormat.getNumberInstance(Locale.US).format(amount).replace(",", " ")
 }

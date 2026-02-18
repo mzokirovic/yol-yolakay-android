@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -13,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.yol_yolakay.feature.publish.PublishUiState
 import java.text.NumberFormat
 import java.util.Locale
@@ -28,10 +28,13 @@ fun Step6Price(
     val cs = MaterialTheme.colorScheme
 
     val currentPriceLong = uiState.draft.price.filter(Char::isDigit).toLongOrNull() ?: 0L
-    val hasRange = uiState.priceSuggestion.hasRange
-    val minL = uiState.priceSuggestion.minLong
-    val maxL = uiState.priceSuggestion.maxLong
-    val recL = uiState.priceSuggestion.recommendedLong
+    val sug = uiState.priceSuggestion
+    val hasRange = sug.hasRange
+    val minL = sug.minLong
+    val maxL = sug.maxLong
+    val recL = sug.recommendedLong
+
+    val step = 5000
 
     val decEnabled = if (hasRange) currentPriceLong > minL else currentPriceLong > 5000L
     val incEnabled = if (hasRange) currentPriceLong < maxL else true
@@ -39,23 +42,37 @@ fun Step6Price(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
             text = "Bir kishi uchun narx",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
+        Text(
+            text = "Bu ridesharing: maqsad — xarajatlarni bo‘lishish",
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant
+        )
 
-        Spacer(Modifier.height(10.dp))
-
-        // Distance + recommended
-        if (uiState.priceSuggestion.isLoading) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(8.dp))
-            Text("Masofa o'lchanmoqda...", color = cs.onSurfaceVariant)
+        if (sug.isLoading) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = cs.surfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Masofa va tavsiya narx hisoblanmoqda…", color = cs.onSurfaceVariant)
+                }
+            }
         } else {
+            // ✅ Suggestion card
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = cs.surfaceVariant.copy(alpha = 0.55f),
@@ -63,22 +80,45 @@ fun Step6Price(
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Masofa: ${uiState.priceSuggestion.distanceKm} km",
+                        text = "Masofa: ${sug.distanceKm} km",
                         style = MaterialTheme.typography.bodyMedium,
                         color = cs.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "Tavsiya: ${formatMoney(recL)} so‘m",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = cs.primary
-                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "Tavsiya narx",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = cs.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${formatMoney(recL)} so‘m",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = cs.primary
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = { if (recL > 0) onPriceChange(recL.toString()) },
+                            enabled = recL > 0,
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.TipsAndUpdates, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Olish")
+                        }
+                    }
+
                     if (hasRange) {
-                        Spacer(Modifier.height(6.dp))
                         Text(
                             text = "Oraliq: ${formatMoney(minL)} .. ${formatMoney(maxL)} so‘m",
                             style = MaterialTheme.typography.bodySmall,
@@ -89,78 +129,72 @@ fun Step6Price(
             }
         }
 
-        Spacer(Modifier.height(26.dp))
-
-        // Controls
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+        // ✅ Big price control
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = cs.surfaceVariant.copy(alpha = 0.55f),
             modifier = Modifier.fillMaxWidth()
         ) {
-            FilledTonalIconButton(
-                onClick = { onAdjustPrice(-5000) },
-                enabled = decEnabled,
-                modifier = Modifier.size(56.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(Icons.Default.Remove, contentDescription = "Kamaytirish")
-            }
+                FilledTonalIconButton(
+                    onClick = { onAdjustPrice(-step) },
+                    enabled = decEnabled,
+                    modifier = Modifier.size(52.dp)
+                ) { Icon(Icons.Default.Remove, contentDescription = "Kamaytirish") }
 
-            Spacer(Modifier.width(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = formatMoney(currentPriceLong),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = cs.onSurface
+                    )
+                    Text("so‘m", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                }
 
-            Text(
-                text = formatMoney(currentPriceLong),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = cs.onSurface
-            )
-
-            Spacer(Modifier.width(20.dp))
-
-            FilledTonalIconButton(
-                onClick = { onAdjustPrice(5000) },
-                enabled = incEnabled,
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Oshirish")
+                FilledTonalIconButton(
+                    onClick = { onAdjustPrice(step) },
+                    enabled = incEnabled,
+                    modifier = Modifier.size(52.dp)
+                ) { Icon(Icons.Default.Add, contentDescription = "Oshirish") }
             }
         }
 
-        Text("so‘m", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
-
-        Spacer(Modifier.height(16.dp))
-
-        // Warnings (theme colors)
-        if (currentPriceLong > 0 && !uiState.priceSuggestion.isLoading && recL > 0) {
+        // ✅ Smart feedback (sodda, keyin o‘zgarishi mumkin)
+        if (currentPriceLong > 0 && !sug.isLoading && recL > 0) {
             val low = (recL * 0.7).roundToLong()
             val high = (recL * 1.5).roundToLong()
 
-            when {
-                currentPriceLong < low -> {
-                    InfoCard(
-                        text = "Narx juda past! Benzin xarajatini qoplamasligi mumkin.",
-                        container = cs.tertiaryContainer,
-                        content = cs.onTertiaryContainer
-                    )
-                }
-                currentPriceLong > high -> {
-                    InfoCard(
-                        text = "Narx juda baland! Yo'lovchi topish qiyin bo‘lishi mumkin.",
-                        container = cs.errorContainer,
-                        content = cs.onErrorContainer
-                    )
-                }
-                else -> {
-                    InfoCard(
-                        text = "✅ Narx bozor talablariga mos",
-                        container = cs.primaryContainer,
-                        content = cs.onPrimaryContainer
-                    )
-                }
+            val (text, container, content) = when {
+                currentPriceLong < low ->
+                    Triple("Narx juda past bo‘lishi mumkin. Yo‘l xarajatini hisobga oling.", cs.tertiaryContainer, cs.onTertiaryContainer)
+                currentPriceLong > high ->
+                    Triple("Narx yuqori bo‘lishi mumkin. Yo‘lovchi topish qiyinlashadi.", cs.errorContainer, cs.onErrorContainer)
+                else ->
+                    Triple("✅ Narx ridesharing uchun mos ko‘rinadi.", cs.primaryContainer, cs.onPrimaryContainer)
+            }
+
+            Surface(
+                color = container,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = text,
+                    color = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(14.dp)
+                )
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
+        // ✅ Manual input (har doim bor)
         OutlinedTextField(
             value = uiState.draft.price,
             onValueChange = { onPriceChange(it.filter(Char::isDigit)) },
@@ -172,26 +206,7 @@ fun Step6Price(
     }
 }
 
-@Composable
-private fun InfoCard(
-    text: String,
-    container: androidx.compose.ui.graphics.Color,
-    content: androidx.compose.ui.graphics.Color
-) {
-    Surface(
-        color = container,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = text,
-            color = content,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(14.dp)
-        )
-    }
-}
-
 private fun formatMoney(amount: Long): String {
+    if (amount <= 0) return "0"
     return NumberFormat.getNumberInstance(Locale.US).format(amount).replace(",", " ")
 }
