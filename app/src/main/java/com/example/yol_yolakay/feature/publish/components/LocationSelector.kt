@@ -1,11 +1,17 @@
 package com.example.yol_yolakay.feature.publish.components
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -40,27 +46,61 @@ fun LocationSelector(
     suggestions: List<LocationModel>
 ) {
     var showDialog by remember { mutableStateOf(false) }
+    val cs = MaterialTheme.colorScheme
 
-    Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = currentLocation?.name ?: "",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            placeholder = { Text(placeholder) },
-            leadingIcon = { Icon(Icons.Default.Place, null) },
-            trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
-                disabledTrailingIconColor = MaterialTheme.colorScheme.primary
+    // ✅ UI: TextField ichidagi label/value tartibli bo‘lishi uchun “tile” ko‘rinishida chizamiz
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = cs.surfaceVariant.copy(alpha = 0.55f),
+        tonalElevation = 1.dp,
+        onClick = { showDialog = true }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp)
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = cs.primaryContainer
+            ) {
+                Box(
+                    modifier = Modifier.size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Place, contentDescription = null, tint = cs.onPrimaryContainer)
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(3.dp))
+                val valueText = currentLocation?.name.orEmpty()
+                Text(
+                    text = if (valueText.isBlank()) placeholder else valueText,
+                    style = MaterialTheme.typography.titleSmall, // ✅ barqaror, chiroyli
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (valueText.isBlank()) cs.onSurfaceVariant else cs.onSurface,
+                    maxLines = 1
+                )
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = cs.onSurfaceVariant
             )
-        )
-        Box(modifier = Modifier.matchParentSize().clickable { showDialog = true })
+        }
     }
 
     if (showDialog) {
@@ -82,6 +122,8 @@ private fun LocationSelectionDialog(
     onDismiss: () -> Unit,
     onSelected: (LocationModel) -> Unit
 ) {
+    val cs = MaterialTheme.colorScheme
+
     var selectedRegion by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
 
@@ -106,7 +148,12 @@ private fun LocationSelectionDialog(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (selectedRegion == null) "Hududni tanlang" else selectedRegion!!) },
+                    title = {
+                        Text(
+                            text = if (selectedRegion == null) "Hududni tanlang" else selectedRegion!!,
+                            maxLines = 1
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = {
                             when {
@@ -119,7 +166,7 @@ private fun LocationSelectionDialog(
                             }
                         }) {
                             Icon(
-                                when {
+                                imageVector = when {
                                     showMapPicker -> Icons.AutoMirrored.Filled.ArrowBack
                                     selectedRegion != null -> Icons.AutoMirrored.Filled.ArrowBack
                                     else -> Icons.Default.Close
@@ -165,11 +212,12 @@ private fun LocationSelectionDialog(
                             onMapClick = {
                                 // Map initial: shu regiondagi birinchi pitak bo‘lsa o‘sha, bo‘lmasa Toshkent
                                 val first = pointsInRegion.firstOrNull()
-                                mapInitial = if (first != null && (abs(first.lat) > 0.0001 || abs(first.lng) > 0.0001)) {
-                                    LatLng(first.lat, first.lng)
-                                } else {
-                                    LatLng(41.311081, 69.240562)
-                                }
+                                mapInitial =
+                                    if (first != null && (abs(first.lat) > 0.0001 || abs(first.lng) > 0.0001)) {
+                                        LatLng(first.lat, first.lng)
+                                    } else {
+                                        LatLng(41.311081, 69.240562)
+                                    }
                                 showMapPicker = true
                             }
                         )
@@ -202,25 +250,41 @@ private fun LocationSelectionDialog(
 
 @Composable
 private fun RegionListScreen(onRegionClick: (String) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Text(
-                "SHAHARNI TANLANG",
+                text = "HUDUDNI TANLANG",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.Gray,
+                color = cs.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(16.dp)
             )
         }
+
         items(UZBEKISTAN_REGIONS, key = { it }) { region ->
             ListItem(
-                headlineContent = { Text(region) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray) },
+                headlineContent = {
+                    Text(
+                        text = region,
+                        style = MaterialTheme.typography.titleSmall, // ✅ tartibli
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                },
+                trailingContent = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        null,
+                        tint = cs.onSurfaceVariant
+                    )
+                },
                 modifier = Modifier.clickable { onRegionClick(region) }
             )
             HorizontalDivider(
                 modifier = Modifier.padding(start = 16.dp),
-                color = Color.LightGray.copy(alpha = 0.2f)
+                color = cs.outlineVariant.copy(alpha = 0.35f)
             )
         }
     }
@@ -235,6 +299,8 @@ private fun DistrictPointsScreen(
     onPointClick: (LocationModel) -> Unit,
     onMapClick: () -> Unit
 ) {
+    val cs = MaterialTheme.colorScheme
+
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = searchText,
@@ -244,24 +310,33 @@ private fun DistrictPointsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            singleLine = true
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp)
         )
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {
                 ListItem(
-                    headlineContent = { Text("Xaritadan belgilash", color = MaterialTheme.colorScheme.primary) },
-                    leadingContent = { Icon(Icons.Default.Map, null, tint = MaterialTheme.colorScheme.primary) },
+                    headlineContent = {
+                        Text(
+                            "Xaritadan belgilash",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.primary,
+                            maxLines = 1
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Default.Map, null, tint = cs.primary) },
                     modifier = Modifier.clickable { onMapClick() }
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = cs.outlineVariant.copy(alpha = 0.35f))
             }
 
             item {
                 Text(
-                    "MASHHUR JOYLAR (PITAKLAR)",
+                    text = "MASHHUR JOYLAR (PITAKLAR)",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color.Gray,
+                    color = cs.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(16.dp)
                 )
@@ -277,21 +352,35 @@ private fun DistrictPointsScreen(
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Bu hududda hozircha pitaklar yo'q", color = Color.Gray)
+                        Text("Bu hududda hozircha pitaklar yo'q", color = cs.onSurfaceVariant)
                     }
                 }
             }
 
             items(filtered, key = { (it.pointId ?: "") + it.name + it.lat + it.lng }) { point ->
                 ListItem(
-                    headlineContent = { Text(point.name) },
-                    supportingContent = { Text(point.region.ifBlank { regionName }) },
+                    headlineContent = {
+                        Text(
+                            text = point.name,
+                            style = MaterialTheme.typography.titleSmall, // ✅ tartibli
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = point.region.ifBlank { regionName },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = cs.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    },
                     leadingContent = { Icon(Icons.Default.LocationOn, null) },
                     modifier = Modifier.clickable { onPointClick(point) }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 16.dp),
-                    color = Color.LightGray.copy(alpha = 0.2f)
+                    color = cs.outlineVariant.copy(alpha = 0.35f)
                 )
             }
         }

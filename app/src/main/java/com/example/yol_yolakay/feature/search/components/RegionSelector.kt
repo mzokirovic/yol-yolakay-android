@@ -2,15 +2,16 @@ package com.example.yol_yolakay.feature.search.components
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,7 +45,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -82,15 +83,25 @@ fun RegionSelectorField(
     value: String,
     enableCurrentLocation: Boolean,
     onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+
+    // External control (Search button bosganda sheetni ochish uchun)
+    openSheet: Boolean = false,
+    onOpenSheetChange: ((Boolean) -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
-    var showSheet by remember { mutableStateOf(false) }
+
+    var internalShow by remember { mutableStateOf(false) }
+    val showSheet = if (onOpenSheetChange != null) openSheet else internalShow
+
+    fun setSheet(v: Boolean) {
+        if (onOpenSheetChange != null) onOpenSheetChange(v) else internalShow = v
+    }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { showSheet = true },
+            .clickable { setSheet(true) },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -108,11 +119,13 @@ fun RegionSelectorField(
                 color = cs.onSurfaceVariant
             )
             Spacer(Modifier.height(2.dp))
+
+            // Bo‘sh bo‘lsa ko‘rinmaydi, lekin layout balandligi saqlanadi
             Text(
-                text = if (value.isBlank()) "Tanlang" else value,
+                text = value.ifBlank { "\u200B" },
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (value.isBlank()) cs.onSurfaceVariant else cs.onSurface
+                color = if (value.isBlank()) cs.onSurfaceVariant.copy(alpha = 0.01f) else cs.onSurface
             )
         }
 
@@ -126,10 +139,10 @@ fun RegionSelectorField(
     if (showSheet) {
         RegionSelectionSheet(
             enableCurrentLocation = enableCurrentLocation,
-            onDismiss = { showSheet = false },
+            onDismiss = { setSheet(false) },
             onSelected = {
                 onSelected(it)
-                showSheet = false
+                setSheet(false)
             }
         )
     }
@@ -143,7 +156,7 @@ private fun RegionSelectionSheet(
     onSelected: (String) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
@@ -152,6 +165,7 @@ private fun RegionSelectionSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Permission request launcher
     val requestPerm = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { res ->
@@ -163,7 +177,19 @@ private fun RegionSelectionSheet(
             return@rememberLauncherForActivityResult
         }
 
+        // Permission berildi — endi Location yoqilganmi tekshiramiz
         scope.launch {
+            if (!isLocationEnabled(context)) {
+                val r = snackbar.showSnackbar(
+                    message = "Lokatsiya (GPS) o‘chiq",
+                    actionLabel = "Yoqish"
+                )
+                if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    openLocationSettings(context)
+                }
+                return@launch
+            }
+
             isResolving = true
             val region = resolveRegionFromCurrentLocation(context)
             isResolving = false
@@ -229,8 +255,7 @@ private fun RegionSelectionSheet(
 
             val filtered = remember(searchText) {
                 val q = searchText.trim()
-                if (q.isBlank()) UZ_REGIONS
-                else UZ_REGIONS.filter { it.contains(q, ignoreCase = true) }
+                if (q.isBlank()) UZ_REGIONS else UZ_REGIONS.filter { it.contains(q, ignoreCase = true) }
             }
 
             LazyColumn(
@@ -260,23 +285,39 @@ private fun RegionSelectionSheet(
                                                         Manifest.permission.ACCESS_FINE_LOCATION
                                                     ) == PackageManager.PERMISSION_GRANTED
 
-                                        if (hasPerm) {
-                                            scope.launch {
-                                                isResolving = true
-                                                val region = resolveRegionFromCurrentLocation(context)
-                                                isResolving = false
-
-                                                val normalized = region?.let { normalizeRegion(it) }
-                                                if (normalized != null) onSelected(normalized)
-                                                else snackbar.showSnackbar("Joriy joylashuvdan viloyat aniqlanmadi")
-                                            }
-                                        } else {
+                                        if (!hasPerm) {
                                             requestPerm.launch(
                                                 arrayOf(
                                                     Manifest.permission.ACCESS_COARSE_LOCATION,
                                                     Manifest.permission.ACCESS_FINE_LOCATION
                                                 )
                                             )
+                                            return@clickable
+                                        }
+
+                                        // ✅ Permission bor — endi Location yoqilganmi?
+                                        if (!isLocationEnabled(context)) {
+                                            scope.launch {
+                                                val r = snackbar.showSnackbar(
+                                                    message = "Lokatsiya (GPS) o‘chiq",
+                                                    actionLabel = "Yoqish"
+                                                )
+                                                if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                                    openLocationSettings(context)
+                                                }
+                                            }
+                                            return@clickable
+                                        }
+
+                                        // ✅ Hammasi OK — region aniqlaymiz
+                                        scope.launch {
+                                            isResolving = true
+                                            val region = resolveRegionFromCurrentLocation(context)
+                                            isResolving = false
+
+                                            val normalized = region?.let { normalizeRegion(it) }
+                                            if (normalized != null) onSelected(normalized)
+                                            else snackbar.showSnackbar("Joriy joylashuvdan viloyat aniqlanmadi")
                                         }
                                     }
                                     .padding(14.dp),
@@ -336,26 +377,42 @@ private fun RegionSelectionSheet(
     }
 }
 
-private suspend fun resolveRegionFromCurrentLocation(context: Context): String? = withContext(Dispatchers.IO) {
+private fun isLocationEnabled(context: Context): Boolean {
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-    fun last(provider: String): Location? = runCatching {
-        if (!lm.isProviderEnabled(provider)) return@runCatching null
-        lm.getLastKnownLocation(provider)
-    }.getOrNull()
-
-    val loc = listOfNotNull(
-        last(LocationManager.NETWORK_PROVIDER),
-        last(LocationManager.GPS_PROVIDER),
-        last(LocationManager.PASSIVE_PROVIDER),
-    ).maxByOrNull { it.time } ?: return@withContext null
-
-    val geocoder = Geocoder(context, Locale.getDefault())
-    val addresses = runCatching { geocoder.getFromLocation(loc.latitude, loc.longitude, 1) }.getOrNull()
-    val a = addresses?.firstOrNull() ?: return@withContext null
-
-    return@withContext a.adminArea ?: a.subAdminArea ?: a.locality
+    val gps = runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false)
+    val network = runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
+    return gps || network
 }
+
+private fun openLocationSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+}
+
+private suspend fun resolveRegionFromCurrentLocation(context: Context): String? =
+    withContext(Dispatchers.IO) {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        fun last(provider: String): Location? = runCatching {
+            if (!lm.isProviderEnabled(provider)) return@runCatching null
+            lm.getLastKnownLocation(provider)
+        }.getOrNull()
+
+        val loc = listOfNotNull(
+            last(LocationManager.NETWORK_PROVIDER),
+            last(LocationManager.GPS_PROVIDER),
+            last(LocationManager.PASSIVE_PROVIDER),
+        ).maxByOrNull { it.time } ?: return@withContext null
+
+        val geocoder = Geocoder(context, Locale.getDefault())
+        val addresses = runCatching { geocoder.getFromLocation(loc.latitude, loc.longitude, 1) }.getOrNull()
+        val a = addresses?.firstOrNull() ?: return@withContext null
+
+        return@withContext a.adminArea ?: a.subAdminArea ?: a.locality
+    }
 
 private fun normalizeRegion(raw: String): String? {
     val s = raw.lowercase(Locale.getDefault())
