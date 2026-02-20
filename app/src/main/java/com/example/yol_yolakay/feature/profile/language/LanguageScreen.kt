@@ -3,22 +3,14 @@ package com.example.yol_yolakay.feature.profile.language
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -27,7 +19,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.UpdateProfileRequest
 import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
-import kotlin.OptIn
 
 data class LanguageState(
     val isLoading: Boolean = true,
@@ -40,9 +31,7 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
     var state by mutableStateOf(LanguageState())
         private set
 
-    init {
-        load()
-    }
+    init { load() }
 
     private fun load() {
         viewModelScope.launch {
@@ -57,21 +46,23 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
         }
     }
 
+    fun consumeError() { state = state.copy(error = null) }
+
     fun select(code: String) {
-        state = state.copy(selected = code)
+        state = state.copy(selected = code, error = null)
     }
 
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
             state = state.copy(isLoading = true, error = null)
-            runCatching {
-                repo.updateMe(UpdateProfileRequest(language = state.selected))
-            }.onSuccess {
-                state = state.copy(isLoading = false)
-                onDone()
-            }.onFailure { e ->
-                state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
-            }
+            runCatching { repo.updateMe(UpdateProfileRequest(language = state.selected)) }
+                .onSuccess {
+                    state = state.copy(isLoading = false)
+                    onDone()
+                }
+                .onFailure { e ->
+                    state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
+                }
         }
     }
 
@@ -80,7 +71,6 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    // 🚨 Argument olib tashlandi
                     return LanguageViewModel(ProfileRemoteRepository()) as T
                 }
             }
@@ -91,55 +81,116 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
 @Composable
 fun LanguageScreen(
     onBack: () -> Unit,
-    vm: LanguageViewModel = viewModel(
-        factory = LanguageViewModel.factory(LocalContext.current)
-    )
+    vm: LanguageViewModel = viewModel(factory = LanguageViewModel.factory(LocalContext.current))
 ) {
     val s = vm.state
-    val options = remember { listOf("uz" to "O‘zbek", "ru" to "Русский") }
+    val cs = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(s.error) {
+        s.error?.let { msg ->
+            scope.launch { snackbarHostState.showSnackbar(msg) }
+            vm.consumeError()
+        }
+    }
+
+    val options = remember {
+        listOf(
+            "uz" to "O‘zbek",
+            "ru" to "Русский"
+        )
+    }
+
+    val isInitialLoading = s.isLoading && s.error == null
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Til") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Orqaga") } }
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
+                    }
+                }
             )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = cs.background,
+        bottomBar = {
+            Surface(color = cs.background) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 14.dp)
+                        .navigationBarsPadding()
+                ) {
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            vm.save(onDone = onBack)
+                        },
+                        enabled = !s.isLoading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        if (s.isLoading && !isInitialLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = cs.onPrimary
+                            )
+                        } else {
+                            Text("Saqlash")
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
+
+        if (isInitialLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
             options.forEach { (code, label) ->
-                Row(
+                Surface(
+                    color = cs.surface,
+                    shape = MaterialTheme.shapes.large,
+                    tonalElevation = 0.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { vm.select(code) }
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .clickable(enabled = !s.isLoading) { vm.select(code) }
                 ) {
-                    Text(label)
-                    RadioButton(
-                        selected = s.selected == code,
-                        onClick = { vm.select(code) }
-                    )
-                }
-            }
-
-            Button(
-                onClick = { vm.save(onDone = onBack) },
-                enabled = !s.isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (s.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                } else {
-                    Text("Saqlash")
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(label, modifier = Modifier.weight(1f))
+                        RadioButton(
+                            selected = s.selected == code,
+                            onClick = { vm.select(code) },
+                            enabled = !s.isLoading
+                        )
+                    }
                 }
             }
         }

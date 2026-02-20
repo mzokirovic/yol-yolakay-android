@@ -26,7 +26,7 @@ data class VehicleState(
         get() = selectedBrand != null &&
                 selectedModelName.isNotBlank() &&
                 selectedColor.isNotBlank() &&
-                plateNumber.length >= 8
+                plateNumber.trim().length >= 6 // 8 emas: "01A777AA" kabi formatlar turlicha bo‘lishi mumkin
 }
 
 class VehicleViewModel(private val repo: ProfileRemoteRepository) : ViewModel() {
@@ -45,7 +45,7 @@ class VehicleViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
                     loadExistingVehicle(brands)
                 }
                 .onFailure { e ->
-                    state = state.copy(isLoading = false, error = e.message)
+                    state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
                 }
         }
     }
@@ -61,14 +61,15 @@ class VehicleViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
                         selectedModelName = v.model.orEmpty(),
                         selectedColor = v.color.orEmpty(),
                         plateNumber = v.plate.orEmpty(),
-                        seats = v.seats?.toString() ?: "4"
+                        seats = v.seats?.toString() ?: "4",
+                        error = null
                     )
                 } else {
-                    state = state.copy(isLoading = false)
+                    state = state.copy(isLoading = false, error = null)
                 }
             }
             .onFailure {
-                state = state.copy(isLoading = false)
+                state = state.copy(isLoading = false, error = null)
             }
     }
 
@@ -76,39 +77,81 @@ class VehicleViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
         state = state.copy(
             selectedBrand = brand,
             selectedModelName = "",
+            // brend o‘zgarsa model reset bo‘lishi shart, qolganlari qolsa ham bo‘ladi
+            error = null
         )
     }
 
     fun onModelSelected(modelName: String) {
-        state = state.copy(selectedModelName = modelName)
+        state = state.copy(selectedModelName = modelName, error = null)
     }
 
     fun onColorSelected(color: String) {
-        state = state.copy(selectedColor = color)
+        state = state.copy(selectedColor = color, error = null)
     }
 
     fun onPlateChange(v: String) {
-        state = state.copy(plateNumber = v.uppercase())
+        // foydalanuvchi yozayotgan paytda formatlashni juda agressiv qilmang
+        state = state.copy(plateNumber = v.uppercase(), error = null)
     }
 
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
             state = state.copy(isLoading = true, error = null)
+
             val req = UpsertVehicleRequest(
-                make = state.selectedBrand?.name ?: "",
-                model = state.selectedModelName,
-                color = state.selectedColor,
-                plate = state.plateNumber,
+                make = state.selectedBrand?.name.orEmpty(),
+                model = state.selectedModelName.trim(),
+                color = state.selectedColor.trim(),
+                plate = state.plateNumber.trim().uppercase(),
                 seats = state.seats.toIntOrNull() ?: 4
             )
 
-            repo.saveVehicle(req)
-                .onSuccess {
-                    state = state.copy(isLoading = false)
+            runCatching { repo.upsertVehicle(req) }
+                .onSuccess { saved ->
+                    // server qaytargan data bilan state’ni “canon” qilamiz
+                    val brand = state.brands.find { it.name == saved.make } ?: state.selectedBrand
+                    state = state.copy(
+                        isLoading = false,
+                        selectedBrand = brand,
+                        selectedModelName = saved.model.orEmpty(),
+                        selectedColor = saved.color.orEmpty(),
+                        plateNumber = saved.plate.orEmpty(),
+                        seats = saved.seats?.toString() ?: state.seats,
+                        error = null
+                    )
                     onDone()
                 }
                 .onFailure { e ->
                     state = state.copy(isLoading = false, error = e.message ?: "Xatolik yuz berdi")
+                }
+        }
+    }
+
+    private fun clearVehicleLocal() {
+        state = state.copy(
+            selectedBrand = null,
+            selectedModelName = "",
+            selectedColor = "",
+            plateNumber = "",
+            seats = "4",
+            error = null
+        )
+    }
+
+    fun deleteVehicle(onDone: () -> Unit) {
+        viewModelScope.launch {
+            state = state.copy(isLoading = true, error = null)
+
+            repo.deleteVehicle()
+                .onSuccess {
+                    clearVehicleLocal()
+                    state = state.copy(isLoading = false)
+                    onDone()
+                }
+                .onFailure { e ->
+                    // ❗️Backend delete ishlamasa — local tozalab yubormaymiz.
+                    state = state.copy(isLoading = false, error = e.message ?: "O‘chirishda xatolik")
                 }
         }
     }
@@ -118,7 +161,6 @@ class VehicleViewModel(private val repo: ProfileRemoteRepository) : ViewModel() 
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    // 🚨 Argument olib tashlandi
                     return VehicleViewModel(ProfileRemoteRepository()) as T
                 }
             }

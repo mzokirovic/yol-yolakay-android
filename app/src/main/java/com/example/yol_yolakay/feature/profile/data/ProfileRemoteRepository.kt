@@ -8,21 +8,15 @@ import com.example.yol_yolakay.core.network.model.UpsertVehicleRequest
 import com.example.yol_yolakay.core.network.model.VehicleApiModel
 import com.example.yol_yolakay.core.network.model.VehicleReferenceResponse
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 
-// 🚨 O'ZGARISH: Konstruktor bo'sh. Argument kerak emas.
 class ProfileRemoteRepository {
 
     private val client = BackendClient.client
-
-    // 🚨 O'ZGARISH: attachUser() funksiyasi olib tashlandi.
-    // Endi BackendClient o'zi header qo'shadi.
 
     suspend fun getMe(): ProfileApiModel {
         return client.get("api/profile/me").body()
@@ -38,10 +32,26 @@ class ProfileRemoteRepository {
         return client.get("api/profile/me/vehicle").body()
     }
 
+    /**
+     * ✅ Yagona to‘g‘ri yo‘l (compat endpoint): PUT /me/vehicle
+     * Backend: vehicles jadvalini upsert qiladi va (agar multi table bo‘lsa) primary’ni ham sync qiladi.
+     */
     suspend fun upsertVehicle(req: UpsertVehicleRequest): VehicleApiModel {
         return client.put("api/profile/me/vehicle") {
             setBody(req)
         }.body()
+    }
+
+    /**
+     * ✅ MUHIM: “raqam o‘chmayapti” fix shu.
+     * Backend: DELETE /me/vehicle -> DB’dan vehicles row o‘chadi.
+     */
+    suspend fun deleteVehicle(): Result<Unit> = try {
+        val resp = client.delete("api/profile/me/vehicle")
+        if (resp.status.isSuccess()) Result.success(Unit)
+        else Result.failure(Exception("HTTP ${resp.status.value}"))
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     suspend fun getCarReferences(): Result<List<CarBrandDto>> = try {
@@ -56,13 +66,15 @@ class ProfileRemoteRepository {
         Result.failure(e)
     }
 
+    /**
+     * ⚠️ Legacy: avval siz POST /profile/vehicle ishlatgansiz.
+     * Endi app tomonda ishlatmaymiz. Qoldirsak ham zarar qilmaydi (orqaga moslik).
+     */
+    @Deprecated("Use upsertVehicle(req) instead")
     suspend fun saveVehicle(req: UpsertVehicleRequest): Result<Unit> = try {
-        val resp = client.post("api/profile/vehicle") {
-            contentType(ContentType.Application.Json)
-            setBody(req)
-        }
-        if (resp.status.isSuccess()) Result.success(Unit)
-        else Result.failure(Exception("HTTP ${resp.status.value}"))
+        // Minimal risk: eski chaqiruvlar sinmasin deb, ichidan yangi endpointni chaqiramiz.
+        upsertVehicle(req)
+        Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
     }

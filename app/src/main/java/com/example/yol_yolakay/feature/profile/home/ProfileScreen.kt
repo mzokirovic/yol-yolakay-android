@@ -34,7 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.yol_yolakay.feature.profile.ui.* // ✅ reuse components from ProfileUiComponents.kt
+import com.example.yol_yolakay.feature.profile.ui.*
 import com.example.yol_yolakay.navigation.Screen
 import kotlinx.coroutines.launch
 
@@ -72,6 +72,16 @@ fun ProfileScreen(
             return@Scaffold
         }
 
+        // ✅ "Profilni yakunlang" faqat kerak bo'lsa chiqadi
+        val name = state.profile?.displayName.orEmpty().trim()
+        val hasName = name.isNotBlank() && name != "Guest"
+
+        val hasVehicle = state.vehicle?.let { v ->
+            !v.make.isNullOrBlank() && !v.model.isNullOrBlank() && !v.plate.isNullOrBlank()
+        } ?: false
+
+        val showCompleteProfileCard = !hasName || !hasVehicle
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,6 +89,7 @@ fun ProfileScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+
             item {
                 state.error?.let { msg ->
                     Surface(
@@ -101,27 +112,19 @@ fun ProfileScreen(
                     displayName = state.profile?.displayName ?: "Guest",
                     phone = state.profile?.phone ?: "Telefon yo‘q",
                     ratingText = "5.0",
-                    onAvatarClick = { showAvatarSheet = true },
-                    onRefresh = { vm.refresh() }
+                    onAvatarClick = { showAvatarSheet = true }
                 )
             }
 
-            item {
-                QuickActionsGrid(
-                    onManageProfile = { onNavigate(Screen.ProfileEdit) },
-                    onVehicle = { onNavigate(Screen.Vehicle) },
-                    onPayments = { onNavigate(Screen.PaymentMethods) },
-                    onLanguage = { onNavigate(Screen.Language) }
-                )
-            }
-
-            item {
-                HighlightCard(
-                    title = "Profilni yakunlang",
-                    subtitle = "Ishonch va xavfsizlik uchun ma’lumotlarni to‘liq kiriting.",
-                    cta = "Tahrirlash",
-                    onClick = { onNavigate(Screen.ProfileEdit) }
-                )
+            if (showCompleteProfileCard) {
+                item {
+                    HighlightCard(
+                        title = "Profilni yakunlang",
+                        subtitle = "Ishonch va xavfsizlik uchun ma’lumotlarni to‘liq kiriting.",
+                        cta = "Tahrirlash",
+                        onClick = { onNavigate(Screen.ProfileEdit) }
+                    )
+                }
             }
 
             item { SectionTitle("Account") }
@@ -214,7 +217,7 @@ fun ProfileScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Bu rasmingizni boshqalar ko‘radi.",
+                    text = "Boshqalar ko‘radi.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -233,7 +236,7 @@ fun ProfileScreen(
                         }
                 ) {
                     Text(
-                        text = "Update photo",
+                        text = "Rasmni yangilash",
                         modifier = Modifier.padding(vertical = 14.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
@@ -243,21 +246,20 @@ fun ProfileScreen(
                 TextButton(
                     onClick = { showAvatarSheet = false },
                     modifier = Modifier.align(Alignment.End)
-                ) { Text("Cancel") }
+                ) { Text("Bekor") }
             }
         }
     }
 }
 
-/* ---- local-only (hozircha shu ekranga xos) ---- */
+/* ---- local-only (shu ekranga xos) ---- */
 
 @Composable
 private fun ProfileHeader(
     displayName: String,
     phone: String,
     ratingText: String,
-    onAvatarClick: () -> Unit,
-    onRefresh: () -> Unit
+    onAvatarClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -292,47 +294,22 @@ private fun ProfileHeader(
             )
         }
 
-        Column(horizontalAlignment = Alignment.End) {
-            val initial = displayName.firstOrNull()?.uppercase() ?: "G"
+        val initial = displayName.firstOrNull()?.uppercase() ?: "G"
 
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { onAvatarClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = initial,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            TextButton(onClick = onRefresh) { Text("Yangilash") }
-        }
-    }
-}
-
-@Composable
-private fun QuickActionsGrid(
-    onManageProfile: () -> Unit,
-    onVehicle: () -> Unit,
-    onPayments: () -> Unit,
-    onLanguage: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            ActionTile("Profil", Icons.Outlined.Person, onManageProfile, Modifier.weight(1f))
-            ActionTile("Avto", Icons.Outlined.DirectionsCar, onVehicle, Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            ActionTile("To‘lov", Icons.Outlined.Payment, onPayments, Modifier.weight(1f))
-            ActionTile("Til", Icons.Outlined.Translate, onLanguage, Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onAvatarClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
