@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.edit
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
@@ -11,12 +11,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.network.model.UpdateProfileRequest
-import com.example.yol_yolakay.core.session.CurrentUser
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlin.OptIn
 
 data class EditProfileState(
@@ -88,7 +89,7 @@ class EditProfileViewModel(private val repo: ProfileRemoteRepository) : ViewMode
 @Composable
 fun ProfileEditScreen(
     onBack: () -> Unit,
-    vm: EditProfileViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+    vm: EditProfileViewModel = viewModel(
         factory = EditProfileViewModel.factory(LocalContext.current)
     )
 ) {

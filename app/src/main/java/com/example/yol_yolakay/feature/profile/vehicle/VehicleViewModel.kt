@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.vehicle
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -9,7 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.network.model.CarBrandDto
 import com.example.yol_yolakay.core.network.model.UpsertVehicleRequest
-import com.example.yol_yolakay.core.session.CurrentUser
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
 
 data class VehicleState(

@@ -18,13 +18,12 @@ private val DarkColorScheme = darkColorScheme(
     primaryContainer = Color(0xFF1D3A8A),
     onPrimaryContainer = TextPrimaryDark,
 
-    // Secondary (ko'proq "pending/secondary action" uchun)
     secondary = BrandBlueDark,
     onSecondary = Color(0xFF081028),
     secondaryContainer = Color(0xFF1A2B55),
     onSecondaryContainer = TextPrimaryDark,
 
-    // Tertiary (rating star kabi accent)
+    // Accent (rating star, warnings)
     tertiary = Warning,
     onTertiary = Color(0xFF2A1D00),
     tertiaryContainer = Color(0xFF5A3A00),
@@ -40,7 +39,7 @@ private val DarkColorScheme = darkColorScheme(
 
     // Outlines
     outline = OutlineDark,
-    outlineVariant = Color(0xFF334155),
+    outlineVariant = Color(0xFF2B3A55),
 
     // Error
     error = Danger,
@@ -48,7 +47,11 @@ private val DarkColorScheme = darkColorScheme(
     errorContainer = Color(0xFF4C1D1D),
     onErrorContainer = TextPrimaryDark,
 
-    // Misc
+    // Useful for snackbars / elevated surfaces
+    inverseSurface = Color(0xFFE5E7EB),
+    inverseOnSurface = Color(0xFF0F172A),
+    inversePrimary = BrandBlue,
+
     scrim = Color.Black
 )
 
@@ -56,16 +59,15 @@ private val LightColorScheme = lightColorScheme(
     // Brand
     primary = BrandBlue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDE7FF),
+    primaryContainer = Color(0xFFDCE7FF),
     onPrimaryContainer = TextPrimaryLight,
 
-    // Secondary
     secondary = BrandBlue,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFEAF0FF),
     onSecondaryContainer = TextPrimaryLight,
 
-    // Tertiary (accent)
+    // Accent
     tertiary = Warning,
     onTertiary = Color(0xFF2A1D00),
     tertiaryContainer = Color(0xFFFFE7B6),
@@ -81,7 +83,7 @@ private val LightColorScheme = lightColorScheme(
 
     // Outlines
     outline = OutlineLight,
-    outlineVariant = Color(0xFFE5E7EB),
+    outlineVariant = Color(0xFFCBD5E1),
 
     // Error
     error = Danger,
@@ -89,7 +91,10 @@ private val LightColorScheme = lightColorScheme(
     errorContainer = Color(0xFFFEE2E2),
     onErrorContainer = Color(0xFF7F1D1D),
 
-    // Misc
+    inverseSurface = Color(0xFF0F172A),
+    inverseOnSurface = Color(0xFFE5E7EB),
+    inversePrimary = BrandBlueDark,
+
     scrim = Color.Black
 )
 
@@ -110,6 +115,7 @@ fun YolYolakayTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = AppShapes,
         content = content
     )
 }

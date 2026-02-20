@@ -55,11 +55,11 @@ import com.example.yol_yolakay.feature.inbox.InboxHubScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
-import com.example.yol_yolakay.feature.profile.LanguageScreen
-import com.example.yol_yolakay.feature.profile.PaymentMethodsScreen
-import com.example.yol_yolakay.feature.profile.ProfileEditScreen
-import com.example.yol_yolakay.feature.profile.ProfileScreen
-import com.example.yol_yolakay.feature.profile.VehicleScreen
+import com.example.yol_yolakay.feature.profile.language.LanguageScreen
+import com.example.yol_yolakay.feature.profile.payment.PaymentMethodsScreen
+import com.example.yol_yolakay.feature.profile.edit.ProfileEditScreen
+import com.example.yol_yolakay.feature.profile.home.ProfileScreen
+import com.example.yol_yolakay.feature.profile.vehicle.VehicleScreen
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.search.SearchScreen
 import com.example.yol_yolakay.feature.search.TripListScreen

@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.language
 
 import android.content.Context
 import androidx.compose.foundation.clickable
@@ -23,8 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.UpdateProfileRequest
-import com.example.yol_yolakay.core.session.CurrentUser
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
 import kotlin.OptIn
 
@@ -90,7 +91,7 @@ class LanguageViewModel(private val repo: ProfileRemoteRepository) : ViewModel()
 @Composable
 fun LanguageScreen(
     onBack: () -> Unit,
-    vm: LanguageViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+    vm: LanguageViewModel = viewModel(
         factory = LanguageViewModel.factory(LocalContext.current)
     )
 ) {

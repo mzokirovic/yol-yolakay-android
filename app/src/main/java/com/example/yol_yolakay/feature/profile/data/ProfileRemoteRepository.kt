@@ -1,6 +1,4 @@
-// /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/feature/profile/ProfileRemoteRepository.kt
-
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.data
 
 import com.example.yol_yolakay.core.network.BackendClient
 import com.example.yol_yolakay.core.network.model.CarBrandDto

@@ -28,8 +28,8 @@ import com.example.yol_yolakay.core.session.SessionStore
 import com.example.yol_yolakay.feature.auth.AuthScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsRemoteRepository
 import com.example.yol_yolakay.feature.notifications.NotificationsWork
-import com.example.yol_yolakay.feature.profile.CompleteProfileScreen
-import com.example.yol_yolakay.feature.profile.ProfileRemoteRepository
+import com.example.yol_yolakay.feature.profile.completion.CompleteProfileScreen
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import com.example.yol_yolakay.main.MainScreen
 import com.example.yol_yolakay.ui.theme.YolYolakayTheme
 import com.google.firebase.messaging.FirebaseMessaging

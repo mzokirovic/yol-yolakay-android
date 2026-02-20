@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.completion
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,6 +10,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.example.yol_yolakay.core.network.model.UpdateProfileRequest
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
 
 @Composable

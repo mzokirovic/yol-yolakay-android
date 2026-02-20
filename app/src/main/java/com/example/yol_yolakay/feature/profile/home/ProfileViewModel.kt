@@ -1,6 +1,6 @@
 // /home/mzokirovic/AndroidStudioProjects/YolYolakay/app/src/main/java/com/example/yol_yolakay/feature/profile/ProfileViewModel.kt
 
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.home
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
 
 class ProfileViewModel(private val repo: ProfileRemoteRepository) : ViewModel() {

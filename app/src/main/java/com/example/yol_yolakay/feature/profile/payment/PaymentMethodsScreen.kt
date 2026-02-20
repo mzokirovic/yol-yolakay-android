@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.payment
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize

@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile
+package com.example.yol_yolakay.feature.profile.home
 
 import com.example.yol_yolakay.core.network.model.ProfileApiModel
 import com.example.yol_yolakay.core.network.model.VehicleApiModel
