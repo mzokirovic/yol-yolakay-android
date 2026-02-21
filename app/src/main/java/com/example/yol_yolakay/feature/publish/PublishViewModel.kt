@@ -139,10 +139,14 @@ class PublishViewModel : ViewModel() {
                 fromLat = from.lat,
                 fromLng = from.lng,
                 fromPointId = from.pointId,
+                fromRegion = from.region.takeIf { it.isNotBlank() },
+
                 toLocation = to.name,
                 toLat = to.lat,
                 toLng = to.lng,
                 toPointId = to.pointId,
+                toRegion = to.region.takeIf { it.isNotBlank() },
+
                 date = draft.date.format(DateTimeFormatter.ISO_DATE),
                 time = draft.time.format(DateTimeFormatter.ofPattern("HH:mm")),
                 price = price,
