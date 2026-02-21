@@ -134,6 +134,19 @@ fun TripDetailsScreen(
     }
     val timePretty = remember(dep) { dep?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—:—" }
 
+
+    // --- ROUTE META (ETA) ---
+    val distanceKm = remember(trip?.distanceKm) { trip?.distanceKm?.takeIf { it > 0 } }
+    val durationMin = remember(trip?.durationMin) { trip?.durationMin?.takeIf { it > 0 } }
+
+    val arrivalTimePretty = remember(dep, durationMin) {
+        if (dep != null && durationMin != null) {
+            dep.plusMinutes(durationMin.toLong())
+                .format(DateTimeFormatter.ofPattern("HH:mm"))
+        } else "—:—"
+    }
+
+
     // --- STATUS + TIME (UI LOCK) ---
     val tripStatus = remember(trip?.status) { normalizeStatus(trip?.status) }
 
@@ -277,10 +290,13 @@ fun TripDetailsScreen(
                             TripHeaderCard(
                                 datePretty = datePretty,
                                 timePretty = timePretty,
+                                arrivalTimePretty = arrivalTimePretty,
                                 fromCity = trip.fromCity,
                                 toCity = trip.toCity,
                                 price = trip.price,
-                                availableSeats = trip.availableSeats
+                                availableSeats = trip.availableSeats,
+                                distanceKm = distanceKm,
+                                durationMin = durationMin
                             )
                         }
 
@@ -383,10 +399,13 @@ fun TripDetailsScreen(
 private fun TripHeaderCard(
     datePretty: String,
     timePretty: String,
+    arrivalTimePretty: String,
     fromCity: String,
     toCity: String,
     price: Double,
-    availableSeats: Int
+    availableSeats: Int,
+    distanceKm: Int? = null,
+    durationMin: Int? = null
 ) {
     ElevatedCard(
         shape = RoundedCornerShape(24.dp),
@@ -443,13 +462,25 @@ private fun TripHeaderCard(
                 departureTime = timePretty,
                 departureCity = fromCity,
                 departurePlace = "Belgilangan joy",
-                arrivalTime = "—:—",
+                arrivalTime = arrivalTimePretty,
                 arrivalCity = toCity,
                 arrivalPlace = "Shahar markazi"
             )
 
+            // ✅ Meta chips (masofa / vaqt)
+            if (distanceKm != null || durationMin != null) {
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (distanceKm != null) MetaChip(text = "$distanceKm km")
+                    if (durationMin != null) MetaChip(text = formatDurationUz(durationMin))
+                }
+            }
+
             Spacer(Modifier.height(14.dp))
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+            )
             Spacer(Modifier.height(12.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -468,6 +499,30 @@ private fun TripHeaderCard(
             }
         }
     }
+}
+
+@Composable
+private fun MetaChip(text: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun formatDurationUz(min: Int): String {
+    val m = min.coerceAtLeast(0)
+    if (m < 60) return "$m daq"
+    val h = m / 60
+    val r = m % 60
+    return if (r == 0) "${h} soat" else "${h} soat ${r} daq"
 }
 
 @Composable

@@ -1,12 +1,32 @@
 package com.example.yol_yolakay.feature.search
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,8 +39,27 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,8 +77,6 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import com.example.yol_yolakay.feature.search.components.TripItem
-
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 private val CardRadius = 20.dp
@@ -125,7 +162,8 @@ fun TripListScreen(
                                 visible = true,
                                 enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { 24 }
                             ) {
-                                TripItem(
+                                // ✅ TripItem o‘rniga shu fayldagi TripItemCard ishlatamiz
+                                TripItemCard(
                                     trip = trip,
                                     onClick = {
                                         val id = trip.id
@@ -285,7 +323,18 @@ fun TripItemCard(
         }.getOrNull() ?: "--:--"
     }
 
-    // Press state — subtle scale
+    // ✅ Yetib borish vaqti (duration_min bo‘lsa)
+    val arrTime = remember(trip.departureTime, trip.durationMin) {
+        val min = trip.durationMin
+        if (min == null || min <= 0) return@remember null
+        runCatching {
+            OffsetDateTime.parse(trip.departureTime)
+                .plusMinutes(min.toLong())
+                .format(DateTimeFormatter.ofPattern("HH:mm"))
+        }.getOrNull()
+    }
+
+    // Press state — subtle scale (hozir UXga ta’sir qilmaydi, lekin xavfsiz qoldirdim)
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.985f else 1f,
@@ -314,14 +363,24 @@ fun TripItemCard(
                     .height(64.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Departure time
-                Text(
-                    text = depTime,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.width(52.dp)
-                )
+                // ✅ Departure + Arrival time (BlaBlaCar kabi)
+                Column(
+                    modifier = Modifier.width(52.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = depTime,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = arrTime ?: "—:—",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 // Journey timeline (dashed line with dots)
                 JourneyTimeline(

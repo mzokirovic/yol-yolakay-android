@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
@@ -135,8 +136,28 @@ fun TripItem(
                 }
 
                 // Right side badges
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     SeatBadge(seats = trip.availableSeats)
+
+                    // ✅ 1 ta kompakt badge: "120 km • ≈ 1 soat 40 daq"
+                    val km = trip.distanceKm
+                    val min = trip.durationMin
+                    val routeText = remember(km, min) {
+                        val parts = mutableListOf<String>()
+                        if (km != null && km > 0) parts += "$km km"
+                        if (min != null && min > 0) parts += "≈ ${formatDuration(min)}"
+                        parts.joinToString(" • ")
+                    }
+
+                    if (routeText.isNotBlank()) {
+                        InfoBadge(
+                            icon = { Icon(Icons.Default.AddRoad, null, modifier = Modifier.size(14.dp)) },
+                            text = routeText
+                        )
+                    }
 
                     if (!trip.carModel.isNullOrBlank()) {
                         InfoBadge(
@@ -209,4 +230,11 @@ private fun PriceBadge(price: Double) {
             )
         }
     }
+}
+
+private fun formatDuration(min: Int): String {
+    val m = min.coerceAtLeast(0)
+    val h = m / 60
+    val mm = m % 60
+    return if (h <= 0) "${mm} daq" else "${h} soat ${mm} daq"
 }

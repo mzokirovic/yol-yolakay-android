@@ -29,5 +29,8 @@ data class TripApiModel(
 
     @SerialName("status") val status: String? = null,
     @SerialName("started_at") val startedAt: String? = null,
-    @SerialName("ended_at") val endedAt: String? = null
+    @SerialName("ended_at") val endedAt: String? = null,
+
+    @SerialName("distance_km") val distanceKm: Int? = null,
+    @SerialName("duration_min") val durationMin: Int? = null
 )
