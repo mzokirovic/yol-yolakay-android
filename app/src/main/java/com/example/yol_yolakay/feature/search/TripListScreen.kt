@@ -1,15 +1,16 @@
 package com.example.yol_yolakay.feature.search
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,23 +29,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,8 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,8 +83,8 @@ import java.util.Locale
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 private val CardRadius = 20.dp
-private val CardPaddingH = 18.dp
-private val CardPaddingV = 16.dp
+private val CardPaddingH = 20.dp
+private val CardPaddingV = 20.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,8 +99,8 @@ fun TripListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val cs = MaterialTheme.colorScheme
 
-    // TopBar collapse state — title yo'nalishi scroll bilan kichrayadi
     val isScrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
 
     fun reload() = viewModel.searchTrips(from, to, date, passengers)
@@ -112,7 +115,7 @@ fun TripListScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = cs.background,
         topBar = {
             TripListTopBar(
                 from = from,
@@ -144,12 +147,11 @@ fun TripListScreen(
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(
-                            start = 16.dp, end = 16.dp,
-                            top = 12.dp, bottom = 24.dp
+                            start = 20.dp, end = 20.dp,
+                            top = 16.dp, bottom = 32.dp
                         ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Result summary
                         item {
                             ResultSummaryRow(
                                 count = uiState.trips.size,
@@ -162,7 +164,6 @@ fun TripListScreen(
                                 visible = true,
                                 enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { 24 }
                             ) {
-                                // ✅ TripItem o‘rniga shu fayldagi TripItemCard ishlatamiz
                                 TripItemCard(
                                     trip = trip,
                                     onClick = {
@@ -193,72 +194,65 @@ private fun TripListTopBar(
     onBack: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    Surface(
-        shadowElevation = if (isScrolled) 4.dp else 0.dp,
-        color = MaterialTheme.colorScheme.surface
-    ) {
+    val cs = MaterialTheme.colorScheme
+    Surface(color = cs.surface) {
         Column {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // From → To — ikki pill ko'rinishida
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            RouteChip(label = from)
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                modifier = Modifier.size(10.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Text(
+                                text = from,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = cs.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            RouteChip(label = to)
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = cs.onSurfaceVariant
+                            )
+                            Text(
+                                text = to,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = cs.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             datePretty,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.labelMedium,
+                            color = cs.onSurfaceVariant
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Orqaga"
-                        )
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Yangilash")
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = cs.surface
                 )
             )
+            if (isScrolled) {
+                HorizontalDivider(color = cs.outlineVariant)
+            }
         }
-    }
-}
-
-@Composable
-private fun RouteChip(label: String) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 
@@ -268,38 +262,39 @@ private fun RouteChip(label: String) {
 
 @Composable
 private fun ResultSummaryRow(count: Int, passengers: Int) {
+    val cs = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "$count ta safar topildi",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            "$count ta safar",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = cs.onSurface
         )
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer
+            color = cs.surfaceVariant.copy(alpha = 0.5f)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    Icons.Default.Person,
+                    Icons.Outlined.Person,
                     contentDescription = null,
-                    modifier = Modifier.size(13.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    modifier = Modifier.size(16.dp),
+                    tint = cs.onSurfaceVariant
                 )
                 Text(
-                    "$passengers o'rin",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    "$passengers kishi",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = cs.onSurfaceVariant,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -308,7 +303,7 @@ private fun ResultSummaryRow(count: Int, passengers: Int) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Trip Item Card  ★  Asosiy karta
+// Trip Item Card (To'g'rilangan)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -316,6 +311,8 @@ fun TripItemCard(
     trip: TripApiModel,
     onClick: () -> Unit
 ) {
+    val cs = MaterialTheme.colorScheme
+
     val depTime = remember(trip.departureTime) {
         runCatching {
             OffsetDateTime.parse(trip.departureTime)
@@ -323,7 +320,6 @@ fun TripItemCard(
         }.getOrNull() ?: "--:--"
     }
 
-    // ✅ Yetib borish vaqti (duration_min bo‘lsa)
     val arrTime = remember(trip.departureTime, trip.durationMin) {
         val min = trip.durationMin
         if (min == null || min <= 0) return@remember null
@@ -334,7 +330,6 @@ fun TripItemCard(
         }.getOrNull()
     }
 
-    // Press state — subtle scale (hozir UXga ta’sir qilmaydi, lekin xavfsiz qoldirdim)
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.985f else 1f,
@@ -342,72 +337,76 @@ fun TripItemCard(
         label = "card_scale"
     )
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(CardRadius))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             ),
         shape = RoundedCornerShape(CardRadius),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 6.dp)
+        color = cs.surface,
+        border = BorderStroke(1.dp, cs.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(CardPaddingH, CardPaddingV)) {
 
-            // ── Main row: Time | Timeline | Cities | Price ────────────────
+            // ── Main row: Dinamik balandlik (IntrinsicSize.Min) ────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
+                    .height(IntrinsicSize.Min), // ✅ Qat'iy 64.dp olib tashlandi
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ✅ Departure + Arrival time (BlaBlaCar kabi)
+                // Vaqt
                 Column(
-                    modifier = Modifier.width(52.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.width(48.dp).fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
                 ) {
                     Text(
                         text = depTime,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium, // ✅ Shrift ixchamlashtirildi
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = cs.onSurface
                     )
+                    Spacer(Modifier.height(18.dp)) // ✅ Ochiq joy (Line uchun)
                     Text(
                         text = arrTime ?: "—:—",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyMedium, // ✅ Shrift ixchamlashtirildi
+                        fontWeight = FontWeight.SemiBold,
+                        color = cs.onSurfaceVariant
                     )
                 }
 
-                // Journey timeline (dashed line with dots)
+                // Journey timeline
                 JourneyTimeline(
                     modifier = Modifier
-                        .width(32.dp)
+                        .width(36.dp)
                         .fillMaxHeight()
-                        .padding(horizontal = 10.dp)
+                        .padding(vertical = 6.dp)
                 )
 
-                // Cities
+                // Shaharlar
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = trip.fromCity,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = cs.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(18.dp))
                     Text(
                         text = trip.toCity,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cs.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -415,92 +414,88 @@ fun TripItemCard(
 
                 Spacer(Modifier.width(12.dp))
 
-                // Price pill
+                // Price (Minimalist)
                 PriceBadge(price = trip.price)
             }
 
-            Spacer(Modifier.height(14.dp))
-
-            // ── Thin separator ──────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            )
-
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(thickness = 1.dp, color = cs.outlineVariant)
+            Spacer(Modifier.height(16.dp))
 
             // ── Footer: Driver info + Car ─────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar circle
+                // Avatar
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(cs.onSurface),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = (trip.driverName?.firstOrNull()?.uppercaseChar() ?: 'H').toString(),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = cs.surface
                     )
                 }
 
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
 
-                // Driver name + rating
+                // Ism va Reyting
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = trip.driverName ?: "Haydovchi",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = cs.onSurface,
+                        maxLines = 1, // ✅ Ism 1 qatordan oshmaydi
+                        overflow = TextOverflow.Ellipsis
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            Icons.Default.Star,
+                            Icons.Filled.Star,
                             contentDescription = null,
-                            modifier = Modifier.size(11.dp),
+                            modifier = Modifier.size(12.dp),
                             tint = Color(0xFFF59E0B)
                         )
                         Text(
                             "4.8",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall,
+                            color = cs.onSurfaceVariant
                         )
                     }
                 }
 
                 // Car badge
                 if (!trip.carModel.isNullOrBlank()) {
+                    Spacer(Modifier.width(8.dp))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                        color = cs.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.widthIn(max = 120.dp) // ✅ Mashina nomi juda uzun bo'lsa kesiladi
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                Icons.Default.DirectionsCar,
+                                Icons.Outlined.DirectionsCar,
                                 contentDescription = null,
-                                modifier = Modifier.size(13.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                modifier = Modifier.size(14.dp),
+                                tint = cs.onSurfaceVariant
                             )
                             Text(
                                 text = trip.carModel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -513,37 +508,39 @@ fun TripItemCard(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Journey timeline: dot → dashed line → dot
+// Journey timeline: qora nuqta -> chiziq -> ochiq doira
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun JourneyTimeline(modifier: Modifier = Modifier) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Canvas(modifier = modifier) {
         val cx = size.width / 2f
-        val dotRadius = 5.dp.toPx()
-        val lineTop = dotRadius * 2.4f
-        val lineBottom = size.height - dotRadius * 2.4f
+        val dotRadius = 4.dp.toPx()
+        val lineTop = dotRadius * 2.5f
+        val lineBottom = size.height - dotRadius * 2.5f
 
-        // Top dot — hollow circle (from)
-        drawCircle(color = outlineColor, radius = dotRadius, center = Offset(cx, dotRadius))
-        drawCircle(color = surfaceColor, radius = dotRadius * 0.55f, center = Offset(cx, dotRadius))
+        // Top dot
+        drawCircle(color = onSurface, radius = dotRadius, center = Offset(cx, dotRadius))
 
-        // Dashed connector
+        // Line
         drawLine(
-            color = outlineColor,
+            color = outlineVariant,
             start = Offset(cx, lineTop),
             end = Offset(cx, lineBottom),
-            strokeWidth = 1.8.dp.toPx(),
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f),
-            cap = StrokeCap.Round
+            strokeWidth = 1.dp.toPx()
         )
 
-        // Bottom dot — filled (to)
-        drawCircle(color = primaryColor, radius = dotRadius, center = Offset(cx, size.height - dotRadius))
+        // Bottom dot (hollow)
+        drawCircle(
+            color = onSurfaceVariant,
+            radius = dotRadius,
+            center = Offset(cx, size.height - dotRadius),
+            style = Stroke(width = 2.dp.toPx())
+        )
     }
 }
 
@@ -553,27 +550,21 @@ private fun JourneyTimeline(modifier: Modifier = Modifier) {
 
 @Composable
 private fun PriceBadge(price: Double) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer
+    val cs = MaterialTheme.colorScheme
+    Column(
+        horizontalAlignment = Alignment.End
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "${price.toInt()}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Text(
-                text = "so'm",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                letterSpacing = 0.sp
-            )
-        }
+        Text(
+            text = "${price.toInt()}",
+            style = MaterialTheme.typography.titleMedium, // ✅ Shrift ixchamlashtirildi
+            fontWeight = FontWeight.Bold,
+            color = cs.onSurface
+        )
+        Text(
+            text = "so'm",
+            style = MaterialTheme.typography.bodySmall,
+            color = cs.onSurfaceVariant
+        )
     }
 }
 
@@ -584,13 +575,13 @@ private fun PriceBadge(price: Double) {
 @Composable
 private fun LoadingView() {
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         items(4) { index ->
             val alpha by animateFloatAsState(
-                targetValue = 0.4f,
+                targetValue = 0.3f,
                 animationSpec = infiniteRepeatable(
                     animation = tween(800, delayMillis = index * 120, easing = EaseInOutSine),
                     repeatMode = RepeatMode.Reverse
@@ -604,84 +595,59 @@ private fun LoadingView() {
 
 @Composable
 private fun ShimmerCard(alpha: Float) {
-    Card(
+    val cs = MaterialTheme.colorScheme
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(CardRadius),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        color = cs.surface,
+        border = BorderStroke(1.dp, cs.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(CardPaddingH, CardPaddingV)) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(64.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Time placeholder
                 Box(
-                    Modifier
-                        .width(48.dp)
-                        .height(22.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                    Modifier.width(48.dp).height(22.dp).clip(RoundedCornerShape(6.dp))
+                        .background(cs.onSurface.copy(alpha = alpha))
                 )
-                // Line placeholder
                 Box(
-                    Modifier
-                        .width(2.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.5f))
+                    Modifier.width(2.dp).height(48.dp).clip(RoundedCornerShape(1.dp))
+                        .background(cs.onSurface.copy(alpha = alpha * 0.5f))
                 )
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
-                        Modifier
-                            .fillMaxWidth(0.6f)
-                            .height(16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                        Modifier.fillMaxWidth(0.6f).height(16.dp).clip(RoundedCornerShape(4.dp))
+                            .background(cs.onSurface.copy(alpha = alpha))
                     )
                     Box(
-                        Modifier
-                            .fillMaxWidth(0.4f)
-                            .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.6f))
+                        Modifier.fillMaxWidth(0.4f).height(14.dp).clip(RoundedCornerShape(4.dp))
+                            .background(cs.onSurface.copy(alpha = alpha * 0.6f))
                     )
                 }
                 Box(
-                    Modifier
-                        .size(52.dp, 44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                    Modifier.size(52.dp, 44.dp).clip(RoundedCornerShape(12.dp))
+                        .background(cs.onSurface.copy(alpha = alpha))
                 )
             }
             Spacer(Modifier.height(14.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            )
+            HorizontalDivider(thickness = 1.dp, color = cs.outlineVariant.copy(alpha = 0.5f))
             Spacer(Modifier.height(12.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                    Modifier.size(36.dp).clip(CircleShape)
+                        .background(cs.onSurface.copy(alpha = alpha))
                 )
                 Box(
-                    Modifier
-                        .width(100.dp)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.7f))
+                    Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp))
+                        .background(cs.onSurface.copy(alpha = alpha * 0.7f))
                 )
             }
         }
@@ -694,41 +660,36 @@ private fun ShimmerCard(alpha: Float) {
 
 @Composable
 fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
     Column(
         modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.errorContainer,
-            modifier = Modifier.size(72.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.DirectionsCar,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        }
+        Icon(
+            Icons.Outlined.DirectionsCar,
+            contentDescription = null,
+            tint = cs.error,
+            modifier = Modifier.size(56.dp)
+        )
         Text(
             "Xatolik yuz berdi",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = cs.onSurface
         )
         Text(
             message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant
         )
         Button(
             onClick = onRetry,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = cs.primary)
         ) {
-            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
             Text("Qayta urinish")
         }
     }
@@ -736,44 +697,36 @@ fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier = Modifie
 
 @Composable
 fun EmptyStateView(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
     Column(
         modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Illustrated empty state icon
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.size(80.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.DirectionsCar,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
+        Icon(
+            Icons.Outlined.SearchOff,
+            contentDescription = null,
+            tint = cs.outlineVariant,
+            modifier = Modifier.size(72.dp)
+        )
         Text(
             "Safarlar topilmadi",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = cs.onSurface
         )
         Text(
             "Boshqa sana yoki yo'nalishni tanlab ko'ring",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = cs.onSurfaceVariant
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         OutlinedButton(
             onClick = onBack,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, cs.outlineVariant)
         ) {
-            Text("Qidiruvga qaytish")
+            Text("Qidiruvga qaytish", color = cs.onSurface)
         }
     }
 }

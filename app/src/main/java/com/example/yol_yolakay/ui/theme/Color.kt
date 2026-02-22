@@ -2,35 +2,29 @@ package com.example.yol_yolakay.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/**
- * Blue Premium palette:
- * - Accent: BrandBlue
- * - Neutrals: Slate-like (premium, minimal)
- */
+// Brand (primary) - O'zingizning Premium ko'k rangingiz
+val BrandBlue = Color(0xFF2563EB)       // Premium blue (ishonch va xavfsizlik)
+val BrandBlueDark = Color(0xFF7AA2FF)
 
-// Brand (primary)
-val BrandBlue = Color(0xFF2563EB)       // premium blue (not too neon)
-val BrandBlueDark = Color(0xFF7AA2FF)   // used as primary in dark theme
+// Neutrals (light) - TOZA OQ VA TINIQ KULRANGLAR (Clean UI uchun)
+val BgLight = Color(0xFFFFFFFF)              // Toza oq (Clean background)
+val SurfaceLight = Color(0xFFFFFFFF)         // Toza oq
+val SurfaceVariantLight = Color(0xFFF3F4F6)  // Och kulrang (Ajratuvchilar va kartalar uchun)
 
-// Neutrals (light)
-val BgLight = Color(0xFFF8FAFC)              // slate-50
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceVariantLight = Color(0xFFF1F5F9)  // slate-100
-
-val TextPrimaryLight = Color(0xFF0F172A)     // slate-900 (near-black)
-val TextSecondaryLight = Color(0xFF64748B)   // slate-500
-val OutlineLight = Color(0xFFE2E8F0)         // slate-200
+val TextPrimaryLight = Color(0xFF111827)     // To'q qora (Tiniq va o'qishli)
+val TextSecondaryLight = Color(0xFF4B5563)   // O'rta kulrang (Subtitle uchun, xira emas)
+val OutlineLight = Color(0xFFE5E7EB)         // Chiziqlar uchun
 
 // Neutrals (dark)
-val BgDark = Color(0xFF0B1220)               // deep navy
-val SurfaceDark = Color(0xFF0F172A)          // slate-900
-val SurfaceVariantDark = Color(0xFF111C33)   // slightly lifted surface
+val BgDark = Color(0xFF0B1220)
+val SurfaceDark = Color(0xFF0F172A)
+val SurfaceVariantDark = Color(0xFF1E293B)
 
-val TextPrimaryDark = Color(0xFFE5E7EB)      // slate-200
-val TextSecondaryDark = Color(0xFF94A3B8)    // slate-400
-val OutlineDark = Color(0xFF334155)          // slate-700
+val TextPrimaryDark = Color(0xFFF9FAFB)
+val TextSecondaryDark = Color(0xFF9CA3AF)
+val OutlineDark = Color(0xFF334155)
 
-// Status (optional)
+// Status
 val Success = Color(0xFF16A34A)
 val Warning = Color(0xFFF59E0B)
-val Danger = Color(0xFFEF4444)
+val Danger = Color(0xFFE11D48)               // Premium qizil (Chiqish tugmasi uchun)

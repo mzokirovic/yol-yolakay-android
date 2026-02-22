@@ -8,8 +8,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -44,13 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.search.components.PassengersPickerField
 import com.example.yol_yolakay.feature.search.components.RegionSelectorField
@@ -58,12 +55,9 @@ import com.example.yol_yolakay.feature.search.components.SearchDatePickerField
 import java.time.LocalDate
 
 // ─── UI tokens ───────────────────────────────────────────────────────────────
-private val CardRadius = 28.dp
-private val FieldRadius = 20.dp
-private val ButtonRadius = 18.dp
-private val SectionSpacing = 16.dp
-private val FieldPaddingH = 16.dp
-private val FieldPaddingV = 14.dp
+private val FieldRadius = 16.dp
+private val ButtonRadius = 16.dp
+private val SectionSpacing = 24.dp
 
 @Composable
 fun SearchScreen(
@@ -72,13 +66,16 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        MapPlaceholder()
-
+    // Toza Oq fon
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         SearchCard(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
                 .statusBarsPadding(),
             uiState = uiState,
             onFromChange = viewModel::onFromLocationChange,
@@ -109,10 +106,8 @@ private fun SearchCard(
     onPassengersChange: (Int) -> Unit,
     onSearchSubmit: () -> Unit
 ) {
-    val cs = MaterialTheme.colorScheme
     val isReady = uiState.fromLocation.isNotBlank() && uiState.toLocation.isNotBlank()
 
-    // Search bosilganda qaysi field bo‘sh bo‘lsa — o‘sha sheet ochiladi
     var openFromSheet by remember { mutableStateOf(false) }
     var openToSheet by remember { mutableStateOf(false) }
 
@@ -122,115 +117,71 @@ private fun SearchCard(
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(380)) + slideInVertically(tween(380, easing = EaseOutCubic)) { -36 },
-        modifier = modifier
+        modifier = modifier.fillMaxWidth()
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 22.dp,
-                    shape = RoundedCornerShape(CardRadius),
-                    ambientColor = cs.scrim.copy(alpha = 0.10f),
-                    spotColor = cs.scrim.copy(alpha = 0.16f)
-                ),
-            shape = RoundedCornerShape(CardRadius),
-            color = cs.surface,
-            tonalElevation = 0.dp
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
 
-                CardHeader()
-
-                Spacer(Modifier.height(SectionSpacing))
-
-                LocationBlock(
-                    uiState = uiState,
-                    onFromChange = onFromChange,
-                    onToChange = onToChange,
-                    onSwap = onSwap,
-                    openFromSheet = openFromSheet,
-                    onOpenFromSheetChange = { openFromSheet = it },
-                    openToSheet = openToSheet,
-                    onOpenToSheetChange = { openToSheet = it },
-                )
-
-                Spacer(Modifier.height(SectionSpacing))
-
-                QuickDateRow(
-                    onDateChange = onDateChange,
-                    selectedDate = uiState.date
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // ✅ Calendar field (dialog + date picker)
-                    // ❗ fieldRadius paramni bermaymiz — type mismatch bo‘lmasin
-                    SearchDatePickerField(
-                        date = uiState.date,
-                        onDateSelected = onDateChange,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    PassengersPickerField(
-                        count = uiState.passengers,
-                        onCountChange = onPassengersChange,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(Modifier.height(SectionSpacing))
-
-                SearchButton(
-                    isReady = isReady,
-                    onClick = {
-                        when {
-                            uiState.fromLocation.isBlank() -> {
-                                openFromSheet = true
-                                openToSheet = false
-                            }
-
-                            uiState.toLocation.isBlank() -> {
-                                openToSheet = true
-                                openFromSheet = false
-                            }
-
-                            else -> onSearchSubmit()
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CardHeader() {
-    val cs = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(9.dp)
-                .clip(CircleShape)
-                .background(cs.primary)
-        )
-        Spacer(Modifier.width(10.dp))
-        Column {
+            // Asosiy Sarlavha
             Text(
                 text = "Safar qidirish",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = cs.onSurface,
-                letterSpacing = (-0.3).sp
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = SectionSpacing)
             )
-            Text(
-                text = "Yo'nalish, sana va o'rinlarni belgilang",
-                style = MaterialTheme.typography.bodySmall,
-                color = cs.onSurfaceVariant
+
+            // ✅ Yagona blok: Manzillar (Qayerdan - Qayerga)
+            LocationBlock(
+                uiState = uiState,
+                onFromChange = onFromChange,
+                onToChange = onToChange,
+                onSwap = onSwap,
+                openFromSheet = openFromSheet,
+                onOpenFromSheetChange = { openFromSheet = it },
+                openToSheet = openToSheet,
+                onOpenToSheetChange = { openToSheet = it }
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Sana va Yo'lovchilar qatori
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SearchDatePickerField(
+                        date = uiState.date,
+                        onDateSelected = onDateChange
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    PassengersPickerField(
+                        count = uiState.passengers,
+                        onCountChange = onPassengersChange
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            // Qidirish tugmasi
+            SearchButton(
+                isReady = isReady,
+                onClick = {
+                    when {
+                        uiState.fromLocation.isBlank() -> {
+                            openFromSheet = true
+                            openToSheet = false
+                        }
+                        uiState.toLocation.isBlank() -> {
+                            openToSheet = true
+                            openFromSheet = false
+                        }
+                        else -> onSearchSubmit()
+                    }
+                }
             )
         }
     }
@@ -249,30 +200,56 @@ private fun LocationBlock(
 ) {
     val cs = MaterialTheme.colorScheme
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-
-        LocationTimeline()
-        Spacer(Modifier.width(12.dp))
-
-        Box(modifier = Modifier.weight(1f)) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(FieldRadius))
+                .border(
+                    width = 1.dp,
+                    color = cs.outlineVariant,
+                    shape = RoundedCornerShape(FieldRadius)
+                )
+                .background(cs.surface)
+        ) {
+            // Timeline: Qora nuqta -> Chiziq -> To'rtburchak (KATTALASHTIRILDI)
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(FieldRadius))
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                cs.surfaceVariant.copy(alpha = 0.55f),
-                                cs.surfaceVariant.copy(alpha = 0.35f)
-                            )
-                        )
-                    )
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(start = 22.dp, top = 32.dp, bottom = 32.dp, end = 12.dp)
             ) {
-                // FROM
+                // Start Nuqtasi (Oldingi 8.dp dan 12.dp ga kattalashtirildi)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = FieldPaddingH, vertical = FieldPaddingV)
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(cs.onSurface)
+                )
+
+                // Bog'lovchi vertikal chiziq
+                Spacer(
+                    modifier = Modifier
+                        .width(1.5.dp) // Chiziq sal qalinlashdi
+                        .height(44.dp) // Uzaytirildi
+                        .background(cs.outlineVariant)
+                )
+
+                // End Nuqtasi (Kvadrat shakli berildi va kattalashtirildi 12.dp)
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .border(2.5.dp, cs.onSurfaceVariant) // Qalinroq ramka
+                )
+            }
+
+            // Kiritish maydonlari
+            Column(modifier = Modifier.weight(1f)) {
+                // Qayerdan
+                Box(
+                    modifier = Modifier.height(72.dp), // Maydon kattalashdi (64.dp dan 72.dp ga)
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     RegionSelectorField(
                         placeholder = "Qayerdan",
@@ -284,18 +261,17 @@ private fun LocationBlock(
                     )
                 }
 
-                HorizontalDivider(color = cs.outlineVariant.copy(alpha = 0.65f))
+                HorizontalDivider(color = cs.outlineVariant)
 
-                // TO
+                // Qayerga
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = FieldPaddingH, vertical = FieldPaddingV)
+                    modifier = Modifier.height(72.dp), // Maydon kattalashdi
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     RegionSelectorField(
                         placeholder = "Qayerga",
                         value = uiState.toLocation,
-                        enableCurrentLocation = true, // ✅ qayerga ichida ham GPS bo‘lsin
+                        enableCurrentLocation = true,
                         onSelected = onToChange,
                         openSheet = openToSheet,
                         onOpenSheetChange = onOpenToSheetChange
@@ -303,87 +279,29 @@ private fun LocationBlock(
                 }
             }
 
-            // Modern swap button
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .offset(x = 12.dp)
-                    .size(42.dp),
-                shape = CircleShape,
-                color = cs.primaryContainer,
-                tonalElevation = 2.dp,
-                shadowElevation = 6.dp,
-                onClick = onSwap
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Rounded.SwapVert,
-                        contentDescription = "Joylarni almashtirish",
-                        tint = cs.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.width(56.dp))
         }
-    }
-}
 
-@Composable
-private fun QuickDateRow(
-    onDateChange: (LocalDate) -> Unit,
-    selectedDate: LocalDate
-) {
-    val today = LocalDate.now()
-    val tomorrow = today.plusDays(1)
-
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        QuickDateChip(
-            label = "Bugun",
-            selected = selectedDate == today,
-            onClick = { onDateChange(today) }
-        )
-        QuickDateChip(
-            label = "Ertaga",
-            selected = selectedDate == tomorrow,
-            onClick = { onDateChange(tomorrow) }
-        )
-    }
-}
-
-@Composable
-private fun QuickDateChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    val containerColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) cs.primaryContainer else cs.surfaceVariant.copy(alpha = 0.55f),
-        animationSpec = tween(180),
-        label = "chip_bg"
-    )
-    val contentColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) cs.onPrimaryContainer else cs.onSurfaceVariant,
-        animationSpec = tween(180),
-        label = "chip_fg"
-    )
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor,
-        modifier = Modifier.height(34.dp)
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            contentAlignment = Alignment.Center
+        // Swap (Almashtirish) tugmasi
+        Surface(
+            modifier = Modifier
+                .padding(end = 16.dp)
+                .size(44.dp)
+                .zIndex(1f),
+            shape = CircleShape,
+            color = cs.surface,
+            border = BorderStroke(1.dp, cs.outlineVariant),
+            shadowElevation = 4.dp,
+            onClick = onSwap
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.SwapVert,
+                    contentDescription = "Almashtirish",
+                    tint = cs.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
@@ -399,18 +317,14 @@ private fun SearchButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp),
+            .height(56.dp),
         shape = RoundedCornerShape(ButtonRadius),
         enabled = true,
         colors = ButtonDefaults.buttonColors(
             containerColor = cs.primary,
             contentColor = cs.onPrimary
         ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 2.dp,
-            disabledElevation = 0.dp
-        )
+        elevation = ButtonDefaults.buttonElevation(0.dp)
     ) {
         AnimatedContent(
             targetState = isReady,
@@ -419,76 +333,10 @@ private fun SearchButton(
         ) { _ ->
             Text(
                 text = "Qidirish",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.2.sp
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
             )
         }
     }
-}
-
-@Composable
-private fun LocationTimeline() {
-    val cs = MaterialTheme.colorScheme
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(top = 18.dp, bottom = 18.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(cs.outline.copy(alpha = 0.35f))
-                .padding(3.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(cs.surface)
-            )
-        }
-
-        Spacer(Modifier.height(6.dp))
-
-        Canvas(modifier = Modifier.height(36.dp).width(2.dp)) {
-            drawLine(
-                color = cs.outline.copy(alpha = 0.28f),
-                start = androidx.compose.ui.geometry.Offset(size.width / 2f, 0f),
-                end = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height),
-                strokeWidth = 2.dp.toPx(),
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
-            )
-        }
-
-        Spacer(Modifier.height(6.dp))
-
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(cs.primary)
-        )
-    }
-}
-
-@Composable
-private fun MapPlaceholder() {
-    val cs = MaterialTheme.colorScheme
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        cs.surface,
-                        cs.surfaceVariant.copy(alpha = 0.25f),
-                        cs.surface.copy(alpha = 0.90f)
-                    )
-                )
-            )
-    )
 }

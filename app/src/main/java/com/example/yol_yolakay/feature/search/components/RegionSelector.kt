@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -98,41 +96,48 @@ fun RegionSelectorField(
         if (onOpenSheetChange != null) onOpenSheetChange(v) else internalShow = v
     }
 
+    // ✅ Ortqicha lokatsiya ikonkalari o'chirildi, matn markazlashtirildi
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { setSheet(true) },
+            .clickable { setSheet(true) }
+            .padding(vertical = 4.dp), // Matn nafas olishi uchun
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Place,
-            contentDescription = null,
-            tint = cs.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(10.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = placeholder,
-                style = MaterialTheme.typography.labelSmall,
-                color = cs.onSurfaceVariant
-            )
-            Spacer(Modifier.height(2.dp))
-
-            // Bo‘sh bo‘lsa ko‘rinmaydi, lekin layout balandligi saqlanadi
-            Text(
-                text = value.ifBlank { "\u200B" },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = if (value.isBlank()) cs.onSurfaceVariant.copy(alpha = 0.01f) else cs.onSurface
-            )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Agar tanlanmagan bo'lsa (bo'sh bo'lsa), faqat placeholder kattaroq bo'lib turadi
+            if (value.isBlank()) {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.titleMedium, // Katta qildik
+                    color = cs.onSurfaceVariant
+                )
+            } else {
+                // Tanlangan bo'lsa, qayerga/qayerdan yozuvi kichik, joy nomi katta bo'ladi
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = cs.onSurfaceVariant
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium, // Katta qildik
+                    fontWeight = FontWeight.Bold,
+                    color = cs.onSurface
+                )
+            }
         }
 
+        // Kichik ko'rinmas yoki xira o'q (tanlash mumkinligini bildirish uchun)
+        // Buni ham olib tashlasangiz bo'ladi agar juda minimalist xohlasangiz
         Icon(
             imageVector = Icons.Default.KeyboardArrowRight,
             contentDescription = null,
-            tint = cs.onSurfaceVariant
+            tint = cs.onSurfaceVariant.copy(alpha = 0.5f)
         )
     }
 
@@ -177,7 +182,6 @@ private fun RegionSelectionSheet(
             return@rememberLauncherForActivityResult
         }
 
-        // Permission berildi — endi Location yoqilganmi tekshiramiz
         scope.launch {
             if (!isLocationEnabled(context)) {
                 val r = snackbar.showSnackbar(
@@ -216,7 +220,7 @@ private fun RegionSelectionSheet(
             ) {
                 Text(
                     text = "Hududni tanlang",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge, // Kattalashtirdik
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     color = cs.onSurface
@@ -295,7 +299,6 @@ private fun RegionSelectionSheet(
                                             return@clickable
                                         }
 
-                                        // ✅ Permission bor — endi Location yoqilganmi?
                                         if (!isLocationEnabled(context)) {
                                             scope.launch {
                                                 val r = snackbar.showSnackbar(
@@ -309,7 +312,6 @@ private fun RegionSelectionSheet(
                                             return@clickable
                                         }
 
-                                        // ✅ Hammasi OK — region aniqlaymiz
                                         scope.launch {
                                             isResolving = true
                                             val region = resolveRegionFromCurrentLocation(context)
@@ -337,7 +339,6 @@ private fun RegionSelectionSheet(
                                         color = cs.onSurfaceVariant
                                     )
                                 }
-                                Icon(Icons.Default.KeyboardArrowRight, null, tint = cs.onSurfaceVariant)
                             }
                         }
                     }
@@ -355,7 +356,7 @@ private fun RegionSelectionSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelected(region) }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                            .padding(horizontal = 16.dp, vertical = 16.dp), // Matnlar orasini sal ochdik
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -365,11 +366,10 @@ private fun RegionSelectionSheet(
                             color = cs.onSurface,
                             modifier = Modifier.weight(1f)
                         )
-                        Icon(Icons.Default.KeyboardArrowRight, null, tint = cs.onSurfaceVariant)
                     }
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = cs.outlineVariant.copy(alpha = 0.7f)
+                        color = cs.outlineVariant.copy(alpha = 0.4f) // Chiziqni yana xiraroq qildik
                     )
                 }
             }

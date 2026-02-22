@@ -1,127 +1,53 @@
 package com.example.yol_yolakay.feature.publish.steps
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
-fun Step5Passengers(
-    count: Int,
-    onCountChange: (Int) -> Unit
-) {
+fun Step5Passengers(count: Int, onCountChange: (Int) -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val min = 1
-    val max = 4
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Text("Bo'sh o'rinlar soni", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Yo'lovchilar uchun nechta joy bor?",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Sedan uchun odatda 1–4 o‘rin",
-            style = MaterialTheme.typography.bodyMedium,
-            color = cs.onSurfaceVariant
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = cs.surfaceVariant.copy(alpha = 0.55f),
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                CounterIconButton(
-                    enabled = count > min,
-                    onClick = { onCountChange((count - 1).coerceAtLeast(min)) }
-                ) { Icon(Icons.Rounded.Remove, null) }
+            IconButton(
+                onClick = { if (count > 1) onCountChange(count - 1) },
+                modifier = Modifier.size(64.dp).border(1.5.dp, cs.outlineVariant, CircleShape)
+            ) { Icon(Icons.Outlined.Remove, null, modifier = Modifier.size(32.dp)) }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = count.toString(),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = cs.onSurface
-                    )
-                    Text(
-                        text = if (count == 1) "o‘rin" else "o‘rin",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = cs.onSurfaceVariant
-                    )
-                }
+            Text(text = count.toString(), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.ExtraBold, letterSpacing = (-2).sp)
 
-                CounterIconButton(
-                    enabled = count < max,
-                    onClick = { onCountChange((count + 1).coerceAtMost(max)) }
-                ) { Icon(Icons.Rounded.Add, null) }
-            }
+            IconButton(
+                onClick = { if (count < 4) onCountChange(count + 1) },
+                modifier = Modifier.size(64.dp).background(cs.onSurface, CircleShape)
+            ) { Icon(Icons.Outlined.Add, null, tint = cs.surface, modifier = Modifier.size(32.dp)) }
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        // ✅ kichik helper text (UX)
-        Text(
-            text = "Haydovchi o‘rni hisoblanmaydi",
-            style = MaterialTheme.typography.bodySmall,
-            color = cs.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun CounterIconButton(
-    enabled: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    val alpha by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.35f,
-        animationSpec = tween(140),
-        label = "btn_alpha"
-    )
-
-    Surface(
-        modifier = Modifier
-            .size(48.dp)
-            .clickable(
-                enabled = enabled,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        color = cs.surface
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            CompositionLocalProvider(LocalContentColor provides cs.onSurface.copy(alpha = alpha)) {
-                content()
-            }
+        Surface(color = cs.surfaceVariant.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp)) {
+            Text(
+                "Haydovchi o'rni hisobga olinmagan. Yo'lovchilar uchun ochiq joylarni belgilang.",
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant
+            )
         }
     }
 }

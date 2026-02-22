@@ -1,23 +1,29 @@
 package com.example.yol_yolakay.feature.inbox
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,6 +32,7 @@ import com.example.yol_yolakay.core.network.model.MessageApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
 import kotlinx.coroutines.launch
 
+// --- UI State ---
 data class ThreadState(
     val isLoading: Boolean = true,
     val messages: List<MessageApiModel> = emptyList(),
@@ -33,6 +40,7 @@ data class ThreadState(
     val input: String = ""
 )
 
+// --- ViewModel ---
 class ThreadViewModel(
     private val userId: String,
     private val repo: InboxRemoteRepository,
@@ -81,7 +89,8 @@ class ThreadViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterialApi::class)
+// --- Main Screen ---
+@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ThreadScreen(
     threadId: String,
@@ -90,7 +99,7 @@ fun ThreadScreen(
     val context = LocalContext.current
     val vm: ThreadViewModel = viewModel(factory = ThreadViewModel.factory(context, threadId))
     val s = vm.state
-
+    val cs = MaterialTheme.colorScheme
     val myId = remember(context) { CurrentUser.id(context) }
 
     val pullState = rememberPullRefreshState(
@@ -98,103 +107,115 @@ fun ThreadScreen(
         onRefresh = { vm.refresh() }
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pullRefresh(pullState)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            // ✅ Modern header (refresh tugmasiz)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Chat",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            s.error?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            if (!s.isLoading && s.messages.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
+    Scaffold(
+        containerColor = cs.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
                     Text(
-                        "Hali xabar yo‘q",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Chat",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                }
-            } else {
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = cs.surface
+                )
+            )
+        }
+    ) { pad ->
+        Box(
+            modifier = Modifier
+                .padding(pad)
+                .fillMaxSize()
+                .pullRefresh(pullState)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // 1. Xabarlar ro'yxati
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(s.messages, key = { it.id ?: "${it.sender_id}_${it.created_at}_${it.text}" }) { m ->
-                        val isMine = m.sender_id == myId
-                        MessageBubble(text = m.text, isMine = isMine)
+                    items(s.messages, key = { it.id ?: it.hashCode() }) { m ->
+                        MessageBubble(text = m.text, isMine = m.sender_id == myId)
+                    }
+                }
+
+                // 2. Premium Composer (Xabar yozish joyi)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = cs.surface,
+                    border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .navigationBarsPadding() // Tizim tugmalari ustida turadi
+                            .imePadding(), // Klaviatura ochilganda yuqoriga ko'tariladi
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = s.input,
+                            onValueChange = vm::onInput,
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Xabar yozing...") },
+                            shape = CircleShape,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = cs.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = cs.surfaceVariant.copy(alpha = 0.3f),
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent
+                            ),
+                            maxLines = 4
+                        )
+
+                        Spacer(Modifier.width(12.dp))
+
+                        // Yuborish tugmasi
+                        IconButton(
+                            onClick = vm::send,
+                            enabled = s.input.isNotBlank(),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (s.input.isNotBlank()) cs.onSurface else cs.outlineVariant.copy(alpha = 0.5f)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Send,
+                                contentDescription = "Send",
+                                tint = if (s.input.isNotBlank()) cs.surface else cs.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            // Composer
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = s.input,
-                    onValueChange = vm::onInput,
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Xabar yozing…") },
-                    singleLine = true
-                )
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = { vm.send() }) {
-                    Icon(Icons.Filled.Send, contentDescription = "Send")
-                }
-            }
+            // Yangilash indikatori
+            PullRefreshIndicator(
+                refreshing = s.isLoading,
+                state = pullState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
-
-        PullRefreshIndicator(
-            refreshing = s.isLoading,
-            state = pullState,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-        )
     }
 }
 
+// --- Xabar pufakchasi ---
 @Composable
 private fun MessageBubble(text: String, isMine: Boolean) {
     val cs = MaterialTheme.colorScheme
@@ -203,15 +224,20 @@ private fun MessageBubble(text: String, isMine: Boolean) {
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 1.dp,
-            color = if (isMine) cs.primaryContainer else cs.surfaceVariant
+            shape = RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isMine) 18.dp else 4.dp,
+                bottomEnd = if (isMine) 4.dp else 18.dp
+            ),
+            color = if (isMine) cs.onSurface else cs.surfaceVariant.copy(alpha = 0.6f),
+            border = if (isMine) null else BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.4f))
         ) {
             Text(
                 text = text,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isMine) cs.onPrimaryContainer else cs.onSurface
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+                color = if (isMine) cs.surface else cs.onSurface
             )
         }
     }

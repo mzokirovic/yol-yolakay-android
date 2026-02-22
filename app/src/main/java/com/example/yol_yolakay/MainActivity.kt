@@ -11,7 +11,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.enableEdgeToEdge // ✅ IMPORT QILINDI
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -59,6 +59,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppGraph.init(this)
+
+        // ✅ ILova to'liq ekranga yoyildi (Edge to Edge dizayn)
         enableEdgeToEdge()
 
         sessionStore = AppGraph.sessionStore(this)
@@ -71,6 +73,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             YolYolakayTheme {
+                // Surface orqali orqa fon belgilangan (Endi tizim panellari ostiga kiradi)
                 Surface(color = MaterialTheme.colorScheme.background) {
                     AppRoot(
                         sessionStore = sessionStore,
@@ -82,8 +85,6 @@ class MainActivity : ComponentActivity() {
         }
 
         requestPostNotificationsIfNeeded()
-        // ❌ bu yerda token sync majbur emas (login bo'lganda AppRoot qiladi)
-        // syncFcmTokenIfLoggedIn()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -114,7 +115,6 @@ class MainActivity : ComponentActivity() {
         val threadId = i.getStringExtra("thread_id")
         val tripId = i.getStringExtra("trip_id")
 
-        // ✅ agar thread/trip bo‘lsa, open_updates ni majburan false qilamiz (tez yo‘l)
         val rawOpenUpdates = i.getBooleanExtra("open_updates", false)
         val openUpdates = if (!threadId.isNullOrBlank() || !tripId.isNullOrBlank()) false else rawOpenUpdates
 
@@ -135,7 +135,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-
     private fun markReadBestEffort(notificationId: String?) {
         if (notificationId.isNullOrBlank()) return
         lifecycleScope.launch(Dispatchers.IO) {
@@ -154,7 +153,6 @@ class MainActivity : ComponentActivity() {
 
     private fun syncFcmTokenIfLoggedIn() {
         lifecycleScope.launch(Dispatchers.IO) {
-            // userId bo'lmasa login emas
             val uid = sessionStore.userIdOrNull() ?: return@launch
             runCatching {
                 val token = FirebaseMessaging.getInstance().token.await()
@@ -181,12 +179,10 @@ private fun AppRoot(
     val ctx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
-    // ✅ FAST PATH: push bosilganda MainScreen’ni profil check bilan bloklamaymiz
     val hasFastDeepLink = remember(deepLink) {
         deepLink?.let { !it.threadId.isNullOrBlank() || !it.tripId.isNullOrBlank() } == true
     }
 
-    // ✅ login bo'lsa: worker + token sync
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             NotificationsWork.start(ctx)
@@ -200,8 +196,6 @@ private fun AppRoot(
         }
     }
 
-    // ✅ Profilni tekshirish (oddiy holatda)
-    // Push fast-path bo‘lsa ham bu background’da ketadi, UI bloklanmaydi
     LaunchedEffect(isLoggedIn) {
         if (!isLoggedIn) {
             profileState = ProfileState.LoggedOut
@@ -220,9 +214,6 @@ private fun AppRoot(
         }
     }
 
-
-    // ✅ 1) Agar login bo‘lsa va push thread/trip bo‘lsa — darhol MainScreen
-    // (profil Loading bo‘lsa ham)
     if (isLoggedIn && hasFastDeepLink) {
         MainScreen(
             deepLink = deepLink,
@@ -231,7 +222,6 @@ private fun AppRoot(
         return
     }
 
-    // ✅ 2) Oddiy flow (avvalgidek)
     when (profileState) {
         ProfileState.LoggedOut -> {
             AuthScreen(
@@ -241,13 +231,15 @@ private fun AppRoot(
         }
 
         ProfileState.Loading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // ✅ Edge to edge bo'lganda elementlar qisilib qolmasligi uchun systemBarsPadding() qilingan
+            Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
 
         ProfileState.Error -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // ✅ Edge to edge bo'lganda elementlar qisilib qolmasligi uchun systemBarsPadding() qilingan
+            Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Internet bilan aloqa yo'q", style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(16.dp))
@@ -263,8 +255,6 @@ private fun AppRoot(
         }
 
         ProfileState.NeedsCompletion -> {
-            // ✅ Agar push openUpdates bo‘lsa ham (xohlasangiz), profilni keyinroq ham qilish mumkin.
-            // Hozircha oddiy: profil to‘ldirishga olib boramiz.
             CompleteProfileScreen(
                 repo = remember { ProfileRemoteRepository() },
                 onDone = { profileState = ProfileState.Complete }
@@ -279,7 +269,6 @@ private fun AppRoot(
         }
     }
 }
-
 
 enum class ProfileState {
     LoggedOut,

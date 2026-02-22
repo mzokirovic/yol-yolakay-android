@@ -1,13 +1,15 @@
 package com.example.yol_yolakay.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
@@ -83,25 +85,30 @@ fun MainScreen(
     val navController = rememberNavController()
     val ctx = LocalContext.current
 
-    // ✅ Notifications VM
     val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
 
-    // ✅ Login state -> notifVm
     val sessionStore = remember { SessionStore(ctx.applicationContext) }
     val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
     LaunchedEffect(isLoggedIn) { notifVm.onLoginState(isLoggedIn) }
 
-    // ✅ unreadCount
     val unreadCount = notifVm.state.unreadCount
-
-    // ✅ Compose versiya mosligi uchun: MutableIntState emas, oddiy Int state
     var openUpdatesSignal by rememberSaveable { mutableStateOf(0) }
 
-    // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Deep link navigation
+    // ✅ Oynani aniqlash va menyuni yashirish mantig'i
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    // ✅ FAQAT shu 4 ta asosiy ekranda menyu ko'rinadi (Publish va boshqalarda yashirinadi)
+    val showBottomBar = currentDestination?.let { dest ->
+        dest.hasRoute(Screen.Search::class) ||
+                dest.hasRoute(Screen.MyTrips::class) ||
+                dest.hasRoute(Screen.Inbox::class) ||
+                dest.hasRoute(Screen.Profile::class)
+    } ?: true
+
     LaunchedEffect(deepLink) {
         val dl = deepLink ?: return@LaunchedEffect
 
@@ -130,7 +137,8 @@ fun MainScreen(
     val bottomNavItems = remember {
         listOf(
             BottomNavItem("Qidiruv", Screen.Search, Icons.Filled.Search, Icons.Outlined.Search),
-            BottomNavItem("E'lon", Screen.Publish, Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
+            // ✅ Ikonka "AddCircle" dan "Add" (oddiy plyus) ga o'zgardi
+            BottomNavItem("E'lon", Screen.Publish, Icons.Filled.Add, Icons.Filled.Add),
             BottomNavItem("Safarlar", Screen.MyTrips, Icons.Filled.DateRange, Icons.Outlined.DateRange),
             BottomNavItem("Inbox", Screen.Inbox, Icons.Filled.Email, Icons.Outlined.Email),
             BottomNavItem("Profil", Screen.Profile, Icons.Filled.Person, Icons.Outlined.Person),
@@ -140,17 +148,26 @@ fun MainScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            MainBottomBar(
-                navController = navController,
-                items = bottomNavItems,
-                unreadCount = unreadCount
-            )
+            // ✅ Menyuni chiroyli tarzda pastga sirg'antirib yashirish
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
+                MainBottomBar(
+                    navController = navController,
+                    items = bottomNavItems,
+                    unreadCount = unreadCount,
+                    currentDestination = currentDestination
+                )
+            }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Search,
-            modifier = Modifier.padding(innerPadding)
+            // ✅ Padding FAQAT menyu ochiq bo'lsagina beriladi, yo'qsa to'liq ekran bo'ladi
+            modifier = Modifier.padding(bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp)
         ) {
 
             composable<Screen.Search> {
@@ -228,14 +245,16 @@ fun MainScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DIZAYN O'ZGARISHSZ SAQLANDI (Sizning asil kodingiz)
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun MainBottomBar(
     navController: NavHostController,
     items: List<BottomNavItem>,
-    unreadCount: Int
+    unreadCount: Int,
+    currentDestination: NavDestination? // ✅ Qo'shildi
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDest = navBackStackEntry?.destination
     val cs = MaterialTheme.colorScheme
 
     Surface(color = cs.surface, shadowElevation = 10.dp) {
@@ -244,10 +263,11 @@ private fun MainBottomBar(
             tonalElevation = 0.dp
         ) {
             items.forEach { item ->
+                // ✅ currentDestination ishlitilmoqda
                 val isSelected = when (item.route) {
-                    Screen.Profile -> currentDest.isProfileSection()
-                    Screen.Inbox -> currentDest.isInboxSection()
-                    else -> currentDest.isInHierarchy(item.route)
+                    Screen.Profile -> currentDestination.isProfileSection()
+                    Screen.Inbox -> currentDestination.isInboxSection()
+                    else -> currentDestination.isInHierarchy(item.route)
                 }
 
                 val iconVector = if (isSelected) item.selectedIcon else item.unselectedIcon

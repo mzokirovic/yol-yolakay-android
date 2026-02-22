@@ -1,18 +1,23 @@
 package com.example.yol_yolakay.feature.profile.completion
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.yol_yolakay.core.network.model.UpdateProfileRequest
 import com.example.yol_yolakay.feature.profile.data.ProfileRemoteRepository
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompleteProfileScreen(
     repo: ProfileRemoteRepository,
@@ -23,113 +28,117 @@ fun CompleteProfileScreen(
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Profilni to‘ldirish",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Text(
-            text = "Ilovadan foydalanish uchun ismingizni kiriting.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-
-        // Ism kiritish
-        OutlinedTextField(
-            value = first,
-            onValueChange = {
-                first = it
-                error = null
-            },
-            label = { Text("Ism") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Next
-            )
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Familiya kiritish
-        OutlinedTextField(
-            value = last,
-            onValueChange = {
-                last = it
-                error = null
-            },
-            label = { Text("Familiya (ixtiyoriy)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done
-            )
-        )
-
-        // Xatolik xabari
-        if (error != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error!!,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Saqlash tugmasi
-        Button(
-            onClick = {
-                val f = first.trim()
-                val l = last.trim()
-
-                if (f.isBlank()) {
-                    error = "Ism kiritish shart"
-                    return@Button
-                }
-
-                val displayName = if (l.isBlank()) f else "$f $l"
-
-                loading = true
-                scope.launch {
-                    runCatching {
-                        repo.updateMe(UpdateProfileRequest(displayName = displayName))
-                    }
-                        .onSuccess {
-                            onDone() // Muvaffaqiyatli bo'lsa MainActivityga signal beramiz
-                        }
-                        .onFailure { e ->
-                            error = e.message ?: "Internet bilan aloqa yo'q yoki xatolik yuz berdi"
-                        }
-                    loading = false
-                }
-            },
-            enabled = !loading,
+    Scaffold(
+        containerColor = cs.background
+    ) { padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp)
+                .statusBarsPadding()
         ) {
-            if (loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
+            // ✅ Header Section
+            Text(
+                text = "Xush kelibsiz!",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-1).sp
+            )
+
+            Text(
+                text = "Safar boshlash uchun profilingizni yakunlang",
+                style = MaterialTheme.typography.bodyLarge,
+                color = cs.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp, bottom = 40.dp)
+            )
+
+            // ✅ Form Section
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = first,
+                    onValueChange = { first = it; error = null },
+                    label = { Text("Ism") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = cs.onSurface,
+                        focusedLabelColor = cs.onSurface
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Next
+                    )
                 )
-            } else {
-                Text("Saqlash va davom etish")
+
+                OutlinedTextField(
+                    value = last,
+                    onValueChange = { last = it; error = null },
+                    label = { Text("Familiya (ixtiyoriy)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = cs.onSurface,
+                        focusedLabelColor = cs.onSurface
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Done
+                    )
+                )
+            }
+
+            // Error Display
+            if (error != null) {
+                Text(
+                    text = error!!,
+                    color = cs.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 12.dp, start = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ✅ Premium Black Action Button
+            Button(
+                onClick = {
+                    val f = first.trim()
+                    if (f.isBlank()) {
+                        error = "Iltimos, ismingizni kiriting"
+                        return@Button
+                    }
+                    val displayName = if (last.trim().isBlank()) f else "$f ${last.trim()}"
+
+                    loading = true
+                    scope.launch {
+                        runCatching { repo.updateMe(UpdateProfileRequest(displayName = displayName)) }
+                            .onSuccess { onDone() }
+                            .onFailure { e -> error = e.message ?: "Xatolik yuz berdi" }
+                        loading = false
+                    }
+                },
+                enabled = !loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .navigationBarsPadding(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = cs.onSurface,
+                    disabledContainerColor = cs.onSurface.copy(alpha = 0.6f)
+                )
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Davom etish", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
             }
         }
     }

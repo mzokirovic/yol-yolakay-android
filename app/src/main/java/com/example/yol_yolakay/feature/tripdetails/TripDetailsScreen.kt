@@ -1,6 +1,7 @@
 package com.example.yol_yolakay.feature.tripdetails
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,25 +25,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -70,11 +63,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.SeatApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
@@ -107,7 +104,6 @@ fun TripDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var startConfirmOpen by remember { mutableStateOf(false) }
-
     val ui by viewModel.uiState.collectAsState()
 
     LaunchedEffect(tripId) {
@@ -117,7 +113,7 @@ fun TripDetailsScreen(
     val trip = ui.trip
 
     // --- MANTIQIY O'ZGARUVCHILAR ---
-    val isDriver = remember(trip, clientId) { trip?.driverId != null && trip.driverId == clientId }
+    val isDriver = remember(trip, clientId) { trip?.driverId != null && trip?.driverId == clientId }
 
     val iBooked = remember(ui.seats, clientId) {
         ui.seats.any { it.status == "booked" && it.holderClientId == clientId }
@@ -134,7 +130,6 @@ fun TripDetailsScreen(
     }
     val timePretty = remember(dep) { dep?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—:—" }
 
-
     // --- ROUTE META (ETA) ---
     val distanceKm = remember(trip?.distanceKm) { trip?.distanceKm?.takeIf { it > 0 } }
     val durationMin = remember(trip?.durationMin) { trip?.durationMin?.takeIf { it > 0 } }
@@ -145,7 +140,6 @@ fun TripDetailsScreen(
                 .format(DateTimeFormatter.ofPattern("HH:mm"))
         } else "—:—"
     }
-
 
     // --- STATUS + TIME (UI LOCK) ---
     val tripStatus = remember(trip?.status) { normalizeStatus(trip?.status) }
@@ -199,7 +193,7 @@ fun TripDetailsScreen(
         onUnblock = { seatNo -> viewModel.unblockSeat(tripId, seatNo) }
     )
 
-    // ✅ START CONFIRM (0 bron bo‘lsa)
+    // START CONFIRM
     if (startConfirmOpen) {
         AlertDialog(
             onDismissRequest = { startConfirmOpen = false },
@@ -220,21 +214,21 @@ fun TripDetailsScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.colorScheme.background, // Clean background
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Safar tafsilotlari", fontWeight = FontWeight.SemiBold) },
+                title = { Text("Safar tafsilotlari", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background // Flat top bar
                 ),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Orqaga")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Orqaga")
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.load(tripId) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Yangilash")
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Yangilash")
                     }
                 }
             )
@@ -244,7 +238,6 @@ fun TripDetailsScreen(
             ChatBottomBar(
                 enabled = canOpenChat,
                 isDriver = isDriver,
-                iBooked = iBooked,
                 onClick = {
                     if (isDriver) {
                         onOpenInbox()
@@ -277,14 +270,14 @@ fun TripDetailsScreen(
                 }
 
                 trip == null -> {
-                    Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center))
+                    Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp) // Karta orasi masofa
                     ) {
                         item {
                             TripHeaderCard(
@@ -303,12 +296,12 @@ fun TripDetailsScreen(
                         item {
                             DriverInfoCard(
                                 driverName = trip.driverName ?: "Haydovchi",
-                                carModel = trip.carModel ?: "Mashina"
+                                carModel = trip.carModel ?: "Noma'lum"
                             )
                         }
 
-                        item {
-                            if (isDriver) {
+                        if (isDriver) {
+                            item {
                                 TripLifecycleCard(
                                     status = tripStatus,
                                     isBusy = ui.isLifecycleBusy,
@@ -325,13 +318,15 @@ fun TripDetailsScreen(
                         }
 
                         item {
-                            Text(
-                                "Joyni tanlang",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                            )
+                            // Sarlavhani ixchamlashtirdik va kartani tozaladik
                             SeatSectionCard {
+                                Text(
+                                    text = "O'rindiqlar",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
                                 SeatMap(
                                     seats = ui.seats,
                                     clientId = clientId,
@@ -341,29 +336,11 @@ fun TripDetailsScreen(
                                 )
                             }
                         }
-
-                        item {
-                            AnimatedVisibility(visible = (!isDriver && iBooked && !canChatWithDriver)) {
-                                AssistiveInfo(
-                                    text = "Diqqat: Haydovchi bilan bog'lanishda muammo bo'lsa, iltimos qo'llab-quvvatlash xizmatiga yozing."
-                                )
-                            }
-                        }
-
-                        // Debug (xohlasangiz keyin olib tashlaymiz)
-                        item {
-                            val label = when (tripStatus) {
-                                "active" -> "active"
-                                "in_progress" -> "in_progress"
-                                "finished" -> "finished"
-                                else -> tripStatus
-                            }
-                            AssistChip(onClick = {}, label = { Text("status: $label") })
-                        }
                     }
                 }
             }
 
+            // Oyna bloklanganda chiqadigan loading indicator
             if (ui.isBooking || ui.isLifecycleBusy) {
                 Box(
                     modifier = Modifier
@@ -372,17 +349,17 @@ fun TripDetailsScreen(
                         .clickable(enabled = false) {},
                     contentAlignment = Alignment.Center
                 ) {
-                    Card(
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface
                     ) {
                         Row(
-                            Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Text("Bajarilmoqda...", fontWeight = FontWeight.Medium)
+                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(16.dp))
+                            Text("Bajarilmoqda...", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -392,7 +369,7 @@ fun TripDetailsScreen(
 }
 
 // ---------------------------------------------------------
-// UI COMPONENTS (premium clean)
+// UI COMPONENTS (Premium Clean)
 // ---------------------------------------------------------
 
 @Composable
@@ -407,113 +384,92 @@ private fun TripHeaderCard(
     distanceKm: Int? = null,
     durationMin: Int? = null
 ) {
-    ElevatedCard(
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = cs.surface,
+        border = BorderStroke(1.dp, cs.outlineVariant), // Soya o'rniga yupqa border
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                    shape = RoundedCornerShape(999.dp)
-                ) {
-                    Text(
-                        text = datePretty,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
+                Text(
+                    text = datePretty,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = cs.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
 
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = price.toInt().toString(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "so‘m",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                        )
-                    }
+                // Minimalist Price Badge
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = price.toInt().toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = cs.onSurface
+                    )
+                    Text(
+                        text = "so‘m",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cs.onSurfaceVariant
+                    )
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(24.dp))
 
+            // Premium Timeline
             TripTimeline(
                 departureTime = timePretty,
                 departureCity = fromCity,
-                departurePlace = "Belgilangan joy",
                 arrivalTime = arrivalTimePretty,
-                arrivalCity = toCity,
-                arrivalPlace = "Shahar markazi"
+                arrivalCity = toCity
             )
 
-            // ✅ Meta chips (masofa / vaqt)
-            if (distanceKm != null || durationMin != null) {
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (distanceKm != null) MetaChip(text = "$distanceKm km")
-                    if (durationMin != null) MetaChip(text = formatDurationUz(durationMin))
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(thickness = 1.dp, color = cs.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            // Footer (Seats and Route Meta)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.Person,
+                        null,
+                        tint = cs.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "$availableSeats ta joy qoldi",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = cs.onSurfaceVariant
+                    )
+                }
+
+                if (distanceKm != null || durationMin != null) {
+                    val meta = listOfNotNull(
+                        distanceKm?.let { "$it km" },
+                        durationMin?.let { formatDurationUz(it) }
+                    ).joinToString(" • ")
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cs.onSurfaceVariant
+                    )
                 }
             }
-
-            Spacer(Modifier.height(14.dp))
-            HorizontalDivider(
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-            )
-            Spacer(Modifier.height(12.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.DirectionsCar,
-                    null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "$availableSeats ta joy qoldi",
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
-    }
-}
-
-@Composable
-private fun MetaChip(text: String) {
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -529,130 +485,107 @@ private fun formatDurationUz(min: Int): String {
 fun TripTimeline(
     departureTime: String,
     departureCity: String,
-    departurePlace: String,
     arrivalTime: String,
-    arrivalCity: String,
-    arrivalPlace: String
+    arrivalCity: String
 ) {
     val cs = MaterialTheme.colorScheme
 
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min), // Dinamik balandlik
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Column(
-            modifier = Modifier.width(60.dp),
+            modifier = Modifier.width(52.dp).fillMaxHeight(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End
         ) {
-            Text(departureTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                arrivalTime,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = cs.onSurfaceVariant
+            Text(departureTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+            Spacer(Modifier.height(24.dp)) // Ochiq joy
+            Text(arrivalTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.onSurfaceVariant)
+        }
+
+        // Timeline dots and line
+        Canvas(
+            modifier = Modifier
+                .width(36.dp)
+                .fillMaxHeight()
+                .padding(vertical = 6.dp)
+        ) {
+            val cx = size.width / 2f
+            val dotRadius = 4.dp.toPx()
+            val lineTop = dotRadius * 2.5f
+            val lineBottom = size.height - dotRadius * 2.5f
+
+            drawCircle(color = cs.onSurface, radius = dotRadius, center = Offset(cx, dotRadius))
+            drawLine(
+                color = cs.outlineVariant,
+                start = Offset(cx, lineTop),
+                end = Offset(cx, lineBottom),
+                strokeWidth = 1.dp.toPx()
+            )
+            drawCircle(
+                color = cs.onSurfaceVariant,
+                radius = dotRadius,
+                center = Offset(cx, size.height - dotRadius),
+                style = Stroke(width = 2.dp.toPx())
             )
         }
 
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp).fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(Icons.Outlined.Circle, null, Modifier.size(14.dp), tint = cs.primary)
-            Canvas(modifier = Modifier.width(2.dp).weight(1f).padding(vertical = 4.dp)) {
-                drawLine(
-                    color = cs.outlineVariant,
-                    start = Offset(0f, 0f),
-                    end = Offset(0f, size.height),
-                    strokeWidth = 4f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                )
-            }
-            Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp), tint = cs.error)
-        }
-
-        Column(
-            modifier = Modifier.fillMaxHeight().weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
-                Text(departureCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    departurePlace,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-            Column {
-                Text(arrivalCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    arrivalPlace,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
+            Text(departureCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = cs.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(24.dp))
+            Text(arrivalCity, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = cs.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 @Composable
 private fun DriverInfoCard(driverName: String, carModel: String) {
-    ElevatedCard(
+    val cs = MaterialTheme.colorScheme
+    Surface(
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        color = cs.surface,
+        border = BorderStroke(1.dp, cs.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(50.dp)
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(cs.onSurface),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        driverName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            Column(Modifier.weight(1f)) {
-                Text(driverName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
                 Text(
-                    carModel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    driverName.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.surface
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("4.8", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.Star,
-                        null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            Spacer(Modifier.width(16.dp))
 
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+            Column(Modifier.weight(1f)) {
+                Text(driverName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        "Tasdiqlangan",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                    Icon(Icons.Outlined.DirectionsCar, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                    Text(carModel, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("4.8", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Filled.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -660,40 +593,40 @@ private fun DriverInfoCard(driverName: String, carModel: String) {
 
 @Composable
 private fun SeatSectionCard(content: @Composable ColumnScope.() -> Unit) {
-    ElevatedCard(
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(20.dp),
             content = content
         )
     }
 }
 
 @Composable
-private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean, onClick: () -> Unit) {
+private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, onClick: () -> Unit) {
     if (!enabled && !isDriver) return
+    val cs = MaterialTheme.colorScheme
     Surface(
-        shadowElevation = 10.dp,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+        color = cs.surface,
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.5f)) // Tepadagi chegara uchun
     ) {
-        Box(modifier = Modifier.padding(16.dp).safeDrawingPadding()) {
+        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp).safeDrawingPadding()) {
             Button(
                 onClick = onClick,
                 enabled = enabled,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = ButtonDefaults.buttonColors(containerColor = cs.onSurface, contentColor = cs.surface) // Premium black/white button
             ) {
-                Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Outlined.ChatBubbleOutline, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
                 Text(
-                    if (isDriver) "Chatlar (Yo‘lovchilar)" else "Haydovchiga yozish",
+                    if (isDriver) "Chatlar" else "Haydovchiga yozish",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -703,59 +636,29 @@ private fun ChatBottomBar(enabled: Boolean, isDriver: Boolean, iBooked: Boolean,
 }
 
 @Composable
-private fun AssistiveInfo(text: String) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(12.dp)
-        )
-    }
-}
-
-@Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.errorContainer,
-            modifier = Modifier.size(76.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.DirectionsCar,
-                    null,
-                    modifier = Modifier.size(34.dp),
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "Xatolik yuz berdi",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+    val cs = MaterialTheme.colorScheme
+    Column(modifier = modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Outlined.DirectionsCar,
+            null,
+            modifier = Modifier.size(56.dp),
+            tint = cs.error
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(14.dp))
-        Button(
+        Spacer(Modifier.height(16.dp))
+        Text("Xatolik yuz berdi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = cs.onSurface)
+        Spacer(Modifier.height(8.dp))
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+        Spacer(Modifier.height(24.dp))
+        OutlinedButton(
             onClick = onRetry,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.height(48.dp)
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.height(48.dp),
+            border = BorderStroke(1.dp, cs.outlineVariant)
         ) {
-            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp), tint = cs.onSurface)
             Spacer(Modifier.width(8.dp))
-            Text("Qayta urinish", fontWeight = FontWeight.SemiBold)
+            Text("Qayta urinish", fontWeight = FontWeight.SemiBold, color = cs.onSurface)
         }
     }
 }
@@ -783,7 +686,6 @@ private fun SeatActionBottomSheet(
 
     val rawStatus = seat.status
     val status = if (uiLocked && rawStatus != "booked") "blocked" else rawStatus
-
     val isMine = seat.holderClientId == clientId
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cs = MaterialTheme.colorScheme
@@ -798,7 +700,7 @@ private fun SeatActionBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -807,8 +709,9 @@ private fun SeatActionBottomSheet(
             ) {
                 Text(
                     "Joy №$selectedSeatNo",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.onSurface
                 )
 
                 val (txt, bg, fg) = when (status) {
@@ -822,7 +725,7 @@ private fun SeatActionBottomSheet(
                 Surface(color = bg, shape = RoundedCornerShape(999.dp)) {
                     Text(
                         txt,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = fg,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium
@@ -837,11 +740,11 @@ private fun SeatActionBottomSheet(
                         ?: "Noma’lum yo'lovchi"
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, null, tint = cs.onSurfaceVariant)
-                    Spacer(Modifier.width(8.dp))
-                    Text(who, style = MaterialTheme.typography.bodyLarge)
+                    Icon(Icons.Outlined.Person, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(who, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                 }
-                Divider(color = cs.outlineVariant.copy(alpha = 0.6f))
+                HorizontalDivider(color = cs.outlineVariant)
             }
 
             if (isDriver) {
@@ -856,17 +759,15 @@ private fun SeatActionBottomSheet(
                             }
                         }
                     }
-
-                    "available" -> SecondaryButton("Joyni yopish (Block)", isBusy) { onBlock(selectedSeatNo) }
-
+                    "available" -> SecondaryButton("Joyni yopish", isBusy) { onBlock(selectedSeatNo) }
                     "blocked" -> {
                         if (uiLocked) {
-                            SecondaryButton("Joyni ochish (Unblock)", isBusy = false) {
-                                onInfo("Safar boshlangan (yoki vaqt o‘tgan). Hozircha joylarni ochib bo‘lmaydi.")
+                            SecondaryButton("Joyni ochish", isBusy = false) {
+                                onInfo("Safar boshlangan. Hozircha joylarni ochib bo‘lmaydi.")
                                 onDismiss()
                             }
                         } else {
-                            SecondaryButton("Joyni ochish (Unblock)", isBusy) { onUnblock(selectedSeatNo) }
+                            SecondaryButton("Joyni ochish", isBusy) { onUnblock(selectedSeatNo) }
                         }
                     }
                 }
@@ -886,11 +787,12 @@ private fun PrimaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = !isBusy,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(16.dp)
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
     ) {
-        if (isBusy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-        else Text(text, fontWeight = FontWeight.SemiBold)
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+        else Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 
@@ -899,11 +801,12 @@ private fun SecondaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) 
     OutlinedButton(
         onClick = onClick,
         enabled = !isBusy,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(16.dp)
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        if (isBusy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-        else Text(text, fontWeight = FontWeight.SemiBold)
+        if (isBusy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurface)
+        else Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

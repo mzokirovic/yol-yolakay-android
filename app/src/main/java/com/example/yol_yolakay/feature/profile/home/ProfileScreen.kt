@@ -6,17 +6,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Payment
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -30,8 +31,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.profile.ui.*
@@ -72,7 +76,6 @@ fun ProfileScreen(
             return@Scaffold
         }
 
-        // ✅ "Profilni yakunlang" faqat kerak bo'lsa chiqadi
         val name = state.profile?.displayName.orEmpty().trim()
         val hasName = name.isNotBlank() && name != "Guest"
 
@@ -86,17 +89,17 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-
             item {
                 state.error?.let { msg ->
                     Surface(
                         color = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                         shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
                     ) {
                         Text(
                             text = msg,
@@ -111,90 +114,119 @@ fun ProfileScreen(
                 ProfileHeader(
                     displayName = state.profile?.displayName ?: "Guest",
                     phone = state.profile?.phone ?: "Telefon yo‘q",
-                    ratingText = "5.0",
-                    onAvatarClick = { showAvatarSheet = true }
+                    ratingText = "5.00",
+                    onAvatarClick = { showAvatarSheet = true },
+                    onHeaderClick = { onNavigate(Screen.ProfileEdit) }
+                )
+            }
+
+            item {
+                ProfileStats(trips = 24, passengers = 89)
+            }
+
+            item {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    thickness = 1.dp
                 )
             }
 
             if (showCompleteProfileCard) {
                 item {
-                    HighlightCard(
-                        title = "Profilni yakunlang",
-                        subtitle = "Ishonch va xavfsizlik uchun ma’lumotlarni to‘liq kiriting.",
-                        cta = "Tahrirlash",
-                        onClick = { onNavigate(Screen.ProfileEdit) }
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                        HighlightCard(
+                            title = "Profilni yakunlang",
+                            subtitle = "Ishonch va xavfsizlik uchun ma’lumotlarni to‘liq kiriting.",
+                            cta = "Tahrirlash",
+                            onClick = { onNavigate(Screen.ProfileEdit) }
+                        )
+                    }
                 }
             }
 
-            item { SectionTitle("Account") }
-
+            // ✅ Barcha ikonkalar Outlined (Bo'sh va yupqa) formatga o'tkazildi
             item {
-                SettingsGroup {
-                    SettingsRow(
-                        icon = Icons.Outlined.Person,
-                        title = "Shaxsiy ma’lumotlar",
-                        subtitle = "Ism, telefon, profil",
-                        onClick = { onNavigate(Screen.ProfileEdit) }
-                    )
-                    DividerInGroup()
+                val vehicleSubtitle = state.vehicle?.let { v ->
+                    listOfNotNull(v.make, v.model)
+                        .joinToString(" ")
+                        .plus(v.color?.let { " • $it" } ?: "")
+                        .ifBlank { "Kiritilmagan" }
+                } ?: "Kiritilmagan"
 
-                    SettingsRow(
-                        icon = Icons.Outlined.Payment,
-                        title = "To‘lov usullari",
-                        subtitle = "Tez orada",
-                        onClick = { onNavigate(Screen.PaymentMethods) }
-                    )
-                    DividerInGroup()
-
-                    val vehicleSubtitle = state.vehicle?.let { v ->
-                        listOfNotNull(v.make, v.model, v.color)
-                            .joinToString(" • ")
-                            .ifBlank { "Kiritilmagan" }
-                    } ?: "Kiritilmagan"
-
-                    SettingsRow(
-                        icon = Icons.Outlined.DirectionsCar,
-                        title = "Avtomobil ma’lumotlari",
-                        subtitle = vehicleSubtitle,
-                        onClick = { onNavigate(Screen.Vehicle) }
-                    )
-                }
+                ProfileMenuRow(
+                    icon = Icons.Outlined.DirectionsCar,
+                    title = "Avtomobilim",
+                    subtitle = vehicleSubtitle,
+                    onClick = { onNavigate(Screen.Vehicle) }
+                )
+                MenuDivider()
             }
 
-            item { SectionTitle("Preferences") }
-
             item {
-                SettingsGroup {
-                    SettingsRow(
-                        icon = Icons.Outlined.Translate,
-                        title = "Til",
-                        subtitle = "Ilova tili",
-                        trailingValue = state.profile?.language ?: "uz",
-                        onClick = { onNavigate(Screen.Language) }
-                    )
-                    DividerInGroup()
-
-                    SettingsRow(
-                        icon = Icons.Outlined.DarkMode,
-                        title = "Theme",
-                        subtitle = "Light / Dark / System",
-                        onClick = { vm.showSoon("Theme") }
-                    )
-                }
+                ProfileMenuRow(
+                    icon = Icons.Outlined.Person,
+                    title = "Shaxsiy ma'lumotlar",
+                    onClick = { onNavigate(Screen.ProfileEdit) }
+                )
+                MenuDivider()
             }
 
-            item { SectionTitle("Support") }
+            item {
+                ProfileMenuRow(
+                    icon = Icons.Outlined.Settings,
+                    title = "Sozlamalar",
+                    onClick = { vm.showSoon("Sozlamalar") }
+                )
+                MenuDivider()
+            }
 
             item {
-                SettingsGroup {
-                    SettingsRow(
-                        icon = Icons.Outlined.HelpOutline,
-                        title = "Yordam markazi",
-                        subtitle = "Savollar va qo‘llab-quvvatlash",
-                        onClick = { vm.showSoon("Yordam markazi") }
-                    )
-                }
+                ProfileMenuRow(
+                    icon = Icons.Outlined.Shield,
+                    title = "Maxfiylik va xavfsizlik",
+                    onClick = { vm.showSoon("Maxfiylik va xavfsizlik") }
+                )
+                MenuDivider()
+            }
+
+            item {
+                ProfileMenuRow(
+                    icon = Icons.Outlined.Notifications,
+                    title = "Bildirishnomalar",
+                    onClick = { vm.showSoon("Bildirishnomalar") }
+                )
+                MenuDivider()
+            }
+
+            item {
+                ProfileMenuRow(
+                    icon = Icons.Outlined.HelpOutline,
+                    title = "Yordam",
+                    onClick = { vm.showSoon("Yordam") }
+                )
+                MenuDivider()
+            }
+
+            item {
+                ProfileMenuRow(
+                    icon = Icons.AutoMirrored.Outlined.ExitToApp,
+                    title = "Chiqish",
+                    textColor = MaterialTheme.colorScheme.error,
+                    iconColor = MaterialTheme.colorScheme.error,
+                    onClick = { vm.showSoon("Chiqish") }
+                )
+            }
+
+            item {
+                Spacer(Modifier.height(40.dp))
+                Text(
+                    text = "Versiya 1.0.0",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -239,7 +271,8 @@ fun ProfileScreen(
                         text = "Rasmni yangilash",
                         modifier = Modifier.padding(vertical = 14.dp),
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
                     )
                 }
 
@@ -252,40 +285,51 @@ fun ProfileScreen(
     }
 }
 
-/* ---- local-only (shu ekranga xos) ---- */
+/* ---- local-only components ---- */
 
 @Composable
 private fun ProfileHeader(
     displayName: String,
     phone: String,
     ratingText: String,
-    onAvatarClick: () -> Unit
+    onAvatarClick: () -> Unit,
+    onHeaderClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onHeaderClick() }
+            .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayName,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
-            AssistChip(
-                onClick = {},
-                label = { Text("★ $ratingText") },
-                leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    leadingIconContentColor = MaterialTheme.colorScheme.tertiary
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Yulduzcha to'la (Filled) qolishi kerak, chunki reyting olinganini bildiradi
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Rating",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(16.dp)
                 )
-            )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = ratingText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 text = phone,
@@ -298,18 +342,114 @@ private fun ProfileHeader(
 
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(64.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MaterialTheme.colorScheme.onSurface)
                 .clickable { onAvatarClick() },
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = initial,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.surface
             )
         }
     }
+}
+
+@Composable
+private fun ProfileStats(trips: Int, passengers: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(40.dp)
+    ) {
+        Column {
+            Text(
+                text = trips.toString(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Safarlar",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Column {
+            Text(
+                text = passengers.toString(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Yo'lovchilar",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileMenuRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+    iconColor: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor
+            )
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Outlined.ChevronRight, // Bu ham yupqalashdi
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun MenuDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
 }
