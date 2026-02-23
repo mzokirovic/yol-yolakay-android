@@ -1,42 +1,26 @@
 package com.example.yol_yolakay.feature.search.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -45,50 +29,45 @@ import java.util.Locale
 fun SearchDatePickerField(
     date: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier,
-    fieldRadius: Int = 20
+    modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
     var open by remember { mutableStateOf(false) }
 
-    val initialMillis = remember(date) {
-        date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    }
-    val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-
     val dateText = remember(date) {
-        date.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale("uz", "UZ")))
+        date.format(DateTimeFormatter.ofPattern("d MMM, EEE", Locale("uz", "UZ")))
     }
 
+    // ✅ Premium Slim Tile Card
     Surface(
-        onClick = { open = true },
-        modifier = modifier.height(58.dp),
-        shape = RoundedCornerShape(fieldRadius.dp),
-        color = cs.surfaceVariant.copy(alpha = 0.55f),
-        tonalElevation = 0.dp
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clickable { open = true },
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.5f)),
+        color = cs.surface
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(cs.primaryContainer),
+                    .background(cs.primary.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.DateRange,
+                    Icons.Outlined.CalendarToday,
                     contentDescription = null,
-                    tint = cs.onPrimaryContainer,
+                    tint = cs.primary,
                     modifier = Modifier.size(18.dp)
                 )
             }
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -100,11 +79,10 @@ fun SearchDatePickerField(
                     color = cs.onSurfaceVariant,
                     maxLines = 1
                 )
-
                 Text(
                     text = dateText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = cs.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -113,26 +91,169 @@ fun SearchDatePickerField(
         }
     }
 
+    // ✅ iOS/Uber style Custom Bottom Sheet Date Picker
     if (open) {
-        DatePickerDialog(
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+        ModalBottomSheet(
             onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val millis = pickerState.selectedDateMillis
-                        if (millis != null) {
-                            val picked = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            onDateSelected(picked)
-                        }
-                        open = false
-                    }
-                ) { Text("Tanlash") }
-            },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Bekor") } }
+            sheetState = sheetState,
+            containerColor = cs.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            DatePicker(state = pickerState)
+            CustomDatePickerSheet(
+                initialDate = date,
+                onDismiss = { open = false },
+                onConfirm = { selectedDate ->
+                    onDateSelected(selectedDate)
+                    open = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomDatePickerSheet(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+
+    val currentYear = LocalDate.now().year
+    val years = (currentYear..(currentYear + 2)).toList()
+    val months = (1..12).toList()
+    val monthNames = listOf("YAN", "FEV", "MART", "APR", "MAY", "IYUN", "IYUL", "AVG", "SENT", "OKT", "NOY", "DEK")
+
+    var selectedYear by remember { mutableStateOf(initialDate.year) }
+    var selectedMonth by remember { mutableStateOf(initialDate.monthValue) }
+    var selectedDay by remember { mutableStateOf(initialDate.dayOfMonth) }
+
+    val maxDays = YearMonth.of(selectedYear, selectedMonth).lengthOfMonth()
+    if (selectedDay > maxDays) selectedDay = maxDays
+    val days = (1..maxDays).toList()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp, top = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "${monthNames[selectedMonth - 1].lowercase().replaceFirstChar { it.uppercase() }}, $selectedYear",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = cs.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                WheelPicker(
+                    items = days.map { it.toString().padStart(2, '0') },
+                    selectedIndex = days.indexOf(selectedDay),
+                    onItemSelected = { selectedDay = days[it] }
+                )
+            }
+            Box(modifier = Modifier.weight(1.5f)) {
+                WheelPicker(
+                    items = monthNames,
+                    selectedIndex = months.indexOf(selectedMonth),
+                    onItemSelected = { selectedMonth = months[it] }
+                )
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                WheelPicker(
+                    items = years.map { it.toString() },
+                    selectedIndex = years.indexOf(selectedYear),
+                    onItemSelected = { selectedYear = years[it] }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onDismiss) {
+                Text("Bekor qilish", style = MaterialTheme.typography.titleMedium, color = cs.onSurface)
+            }
+            Spacer(modifier = Modifier.width(24.dp))
+            Box(modifier = Modifier.height(24.dp).width(1.dp).background(cs.outlineVariant))
+            Spacer(modifier = Modifier.width(24.dp))
+            TextButton(onClick = { onConfirm(LocalDate.of(selectedYear, selectedMonth, selectedDay)) }) {
+                Text("OK", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WheelPicker(
+    items: List<String>,
+    selectedIndex: Int,
+    onItemSelected: (Int) -> Unit
+) {
+    val safeIndex = if (selectedIndex in items.indices) selectedIndex else 0
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    val itemHeight = 48.dp
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val index = listState.firstVisibleItemIndex
+            if (index in items.indices && index != safeIndex) {
+                onItemSelected(index)
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxWidth().height(itemHeight * 3),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(itemHeight)
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+        )
+
+        LazyColumn(
+            state = listState,
+            flingBehavior = flingBehavior,
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            item { Spacer(modifier = Modifier.height(itemHeight)) }
+            items(items.size) { index ->
+                val isSelected = index == listState.firstVisibleItemIndex
+                Box(
+                    modifier = Modifier.height(itemHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = items[index],
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.alpha(if (isSelected) 1f else 0.4f)
+                    )
+                }
+            }
+            item { Spacer(modifier = Modifier.height(itemHeight)) }
         }
     }
 }

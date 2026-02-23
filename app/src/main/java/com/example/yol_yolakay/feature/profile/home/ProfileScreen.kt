@@ -5,16 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ExitToApp
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.yol_yolakay.feature.profile.ui.*
+import com.example.yol_yolakay.feature.profile.ui.HighlightCard
 import com.example.yol_yolakay.navigation.Screen
 import kotlinx.coroutines.launch
 
@@ -120,9 +120,7 @@ fun ProfileScreen(
                 )
             }
 
-            item {
-                ProfileStats(trips = 24, passengers = 89)
-            }
+            item { ProfileStats(trips = 24, passengers = 89) }
 
             item {
                 HorizontalDivider(
@@ -145,7 +143,6 @@ fun ProfileScreen(
                 }
             }
 
-            // ✅ Barcha ikonkalar Outlined (Bo'sh va yupqa) formatga o'tkazildi
             item {
                 val vehicleSubtitle = state.vehicle?.let { v ->
                     listOfNotNull(v.make, v.model)
@@ -155,7 +152,7 @@ fun ProfileScreen(
                 } ?: "Kiritilmagan"
 
                 ProfileMenuRow(
-                    icon = Icons.Outlined.DirectionsCar,
+                    icon = Icons.Rounded.DirectionsCar,
                     title = "Avtomobilim",
                     subtitle = vehicleSubtitle,
                     onClick = { onNavigate(Screen.Vehicle) }
@@ -165,25 +162,26 @@ fun ProfileScreen(
 
             item {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.Person,
+                    icon = Icons.Rounded.Person,
                     title = "Shaxsiy ma'lumotlar",
                     onClick = { onNavigate(Screen.ProfileEdit) }
                 )
                 MenuDivider()
             }
 
+            // ✅ Sozlamalar endi alohida Settings screen
             item {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.Settings,
+                    icon = Icons.Rounded.Settings,
                     title = "Sozlamalar",
-                    onClick = { vm.showSoon("Sozlamalar") }
+                    onClick = { onNavigate(Screen.Settings) }
                 )
                 MenuDivider()
             }
 
             item {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.Shield,
+                    icon = Icons.Rounded.Shield,
                     title = "Maxfiylik va xavfsizlik",
                     onClick = { vm.showSoon("Maxfiylik va xavfsizlik") }
                 )
@@ -192,7 +190,7 @@ fun ProfileScreen(
 
             item {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.Notifications,
+                    icon = Icons.Rounded.Notifications,
                     title = "Bildirishnomalar",
                     onClick = { vm.showSoon("Bildirishnomalar") }
                 )
@@ -201,22 +199,14 @@ fun ProfileScreen(
 
             item {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.HelpOutline,
+                    icon = Icons.Rounded.HelpOutline,
                     title = "Yordam",
                     onClick = { vm.showSoon("Yordam") }
                 )
                 MenuDivider()
             }
 
-            item {
-                ProfileMenuRow(
-                    icon = Icons.AutoMirrored.Outlined.ExitToApp,
-                    title = "Chiqish",
-                    textColor = MaterialTheme.colorScheme.error,
-                    iconColor = MaterialTheme.colorScheme.error,
-                    onClick = { vm.showSoon("Chiqish") }
-                )
-            }
+            // ❌ "Chiqish" bu yerdan olib tashlandi (endi Settings ichida)
 
             item {
                 Spacer(Modifier.height(40.dp))
@@ -313,9 +303,8 @@ private fun ProfileHeader(
             Spacer(Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Yulduzcha to'la (Filled) qolishi kerak, chunki reyting olinganini bildiradi
                 Icon(
-                    imageVector = Icons.Filled.Star,
+                    imageVector = Icons.Rounded.Star,
                     contentDescription = "Rating",
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(16.dp)
@@ -413,17 +402,26 @@ private fun ProfileMenuRow(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = iconColor,
-            modifier = Modifier.size(24.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = textColor
             )
@@ -437,10 +435,10 @@ private fun ProfileMenuRow(
             }
         }
         Icon(
-            imageVector = Icons.Outlined.ChevronRight, // Bu ham yupqalashdi
+            imageVector = Icons.Rounded.ChevronRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(24.dp)
         )
     }
 }
@@ -448,8 +446,8 @@ private fun ProfileMenuRow(
 @Composable
 private fun MenuDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant
+        modifier = Modifier.padding(start = 80.dp, end = 24.dp),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
 }

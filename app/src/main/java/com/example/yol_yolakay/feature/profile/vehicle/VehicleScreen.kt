@@ -10,9 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,28 +47,21 @@ fun VehicleScreen(
         s.selectedBrand != null && s.selectedModelName.isNotBlank() && s.selectedColor.isNotBlank() && s.plateNumber.isNotBlank()
     }
 
-    var mode by rememberSaveable { mutableStateOf(Mode.Wizard) }
-    var didInitMode by rememberSaveable { mutableStateOf(false) }
+    // ✅ Boshlang'ich holat "Null" bo'ladi (Qotib qolish va miltillashning oldini oladi)
+    var mode by rememberSaveable { mutableStateOf<Mode?>(null) }
     var step by rememberSaveable { mutableStateOf(Step.Brand) }
-    var didInitStep by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(s.isLoading, didInitMode, hasSavedVehicle) {
-        if (!s.isLoading && !didInitMode) {
+    // ✅ Serverdan javob kelgachgina ekran holatini tanlaymiz
+    LaunchedEffect(s.isLoading) {
+        if (!s.isLoading && mode == null) {
             mode = if (hasSavedVehicle) Mode.Summary else Mode.Wizard
-            didInitMode = true
-        }
-    }
-
-    LaunchedEffect(mode, s.isLoading, didInitStep) {
-        if (mode == Mode.Wizard && !s.isLoading && !didInitStep) {
             step = when {
                 s.selectedBrand == null -> Step.Brand
                 s.selectedModelName.isBlank() -> Step.Model
                 s.selectedColor.isBlank() -> Step.Color
                 else -> Step.Plate
             }
-            didInitStep = true
         }
     }
 
@@ -82,24 +75,31 @@ fun VehicleScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = if (mode == Mode.Summary) "Mening avtomobilim" else "Avtomobil qo'shish",
+                            text = when (mode) {
+                                Mode.Summary -> "Mening avtomobilim"
+                                Mode.Wizard -> "Avtomobil qo'shish"
+                                null -> "Yuklanmoqda..." // ✅ Bo'sh vaqtda miltillamasligi uchun
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            if (mode == Mode.Summary) onBack()
-                            else {
-                                when (step) {
-                                    Step.Brand -> if (hasSavedVehicle) mode = Mode.Summary else onBack()
-                                    Step.Model -> step = Step.Brand
-                                    Step.Color -> step = Step.Model
-                                    Step.Plate -> step = Step.Color
+                        // ✅ Ma'lumot aniq bo'lgandagina orqaga qaytish tugmasini ko'rsatamiz
+                        if (mode != null) {
+                            IconButton(onClick = {
+                                if (mode == Mode.Summary) onBack()
+                                else {
+                                    when (step) {
+                                        Step.Brand -> if (hasSavedVehicle) mode = Mode.Summary else onBack()
+                                        Step.Model -> step = Step.Brand
+                                        Step.Color -> step = Step.Model
+                                        Step.Plate -> step = Step.Color
+                                    }
                                 }
+                            }) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, null)
                             }
-                        }) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null)
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
@@ -128,17 +128,21 @@ fun VehicleScreen(
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = cs.onSurface)
                         ) {
-                            if (s.isLoading) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = cs.surface, strokeWidth = 2.dp)
-                            else Text("Saqlash", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            if (s.isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = cs.surface, strokeWidth = 2.dp)
+                            } else {
+                                Text("Saqlash", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
                         }
                     }
                 }
             }
         }
     ) { padding ->
-        if (s.isLoading && s.brands.isEmpty()) {
+        // ✅ Agar mode aniqlanmagan yoki yuklanayotgan bo'lsa, butun ekranda faqat aylanuvchi Loader turadi
+        if (mode == null || (s.isLoading && s.brands.isEmpty())) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = cs.onSurface, strokeWidth = 2.dp)
+                CircularProgressIndicator(color = cs.onSurface, strokeWidth = 3.dp)
             }
             return@Scaffold
         }
@@ -155,7 +159,8 @@ fun VehicleScreen(
                         model = s.selectedModelName,
                         color = s.selectedColor,
                         plate = s.plateNumber,
-                        onEdit = { mode = Mode.Wizard; step = Step.Brand; didInitStep = true },
+                        isLoading = s.isLoading,
+                        onEdit = { mode = Mode.Wizard; step = Step.Brand },
                         onDelete = { showDeleteConfirm = true }
                     )
                 }
@@ -172,12 +177,16 @@ fun VehicleScreen(
                         },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
 
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
                         StepIndicatorChip(s.selectedBrand?.name ?: "Marka", step == Step.Brand) { step = Step.Brand }
                         StepIndicatorChip(s.selectedModelName.ifBlank { "Model" }, step == Step.Model, s.selectedBrand != null) { step = Step.Model }
                         StepIndicatorChip(s.selectedColor.ifBlank { "Rang" }, step == Step.Color, s.selectedModelName.isNotBlank()) { step = Step.Color }
@@ -216,12 +225,30 @@ fun VehicleScreen(
                     Step.Plate -> item {
                         OutlinedTextField(
                             value = s.plateNumber,
-                            onValueChange = vm::onPlateChange,
+                            onValueChange = { vm.onPlateChange(it.uppercase()) },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("01 A 777 AA") },
+                            placeholder = { Text("01 A 777 AA", color = cs.onSurfaceVariant.copy(alpha = 0.5f)) },
                             shape = RoundedCornerShape(16.dp),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                            textStyle = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Characters,
+                                imeAction = ImeAction.Done
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = cs.primary,
+                                unfocusedBorderColor = cs.outlineVariant
+                            )
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Raqamni bo'shliqlarsiz kiritishingiz ham mumkin (Masalan: 01A777AA)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = cs.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp)
                         )
                     }
                 }
@@ -232,21 +259,33 @@ fun VehicleScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("O'chirish") },
-            text = { Text("Avtomobil ma'lumotlarini o'chirmoqchimisiz?") },
+            containerColor = cs.surface,
+            shape = RoundedCornerShape(24.dp),
+            title = { Text("O'chirish", fontWeight = FontWeight.Bold) },
+            text = { Text("Haqiqatan ham avtomobil ma'lumotlarini o'chirib tashlamoqchimisiz?") },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteConfirm = false
-                    vm.deleteVehicle { mode = Mode.Wizard; step = Step.Brand; didInitStep = true }
-                }) { Text("O'chirish", color = cs.error) }
+                    vm.deleteVehicle { mode = Mode.Wizard; step = Step.Brand }
+                }) { Text("O'chirish", color = cs.error, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Bekor") } }
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Bekor", color = cs.onSurfaceVariant) }
+            }
         )
     }
 }
 
 @Composable
-private fun VehicleSummaryCard(brand: String, model: String, color: String, plate: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun VehicleSummaryCard(
+    brand: String,
+    model: String,
+    color: String,
+    plate: String,
+    isLoading: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val cs = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -254,24 +293,54 @@ private fun VehicleSummaryCard(brand: String, model: String, color: String, plat
         border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(48.dp).clip(CircleShape).background(cs.onSurface.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.DirectionsCar, null, tint = cs.onSurface)
+                Box(
+                    Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(cs.onSurface.copy(alpha = 0.05f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.DirectionsCar, null, tint = cs.onSurface, modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text("$brand $model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("$color • $plate", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                    Text("$brand $model", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(color = cs.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                            Text(color, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(plate, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
-            Spacer(Modifier.height(20.dp))
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = cs.outlineVariant.copy(alpha = 0.5f))
+            Spacer(Modifier.height(16.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp)) {
-                    Text("Tahrirlash", color = cs.onSurface)
+                OutlinedButton(
+                    onClick = onEdit,
+                    enabled = !isLoading,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Tahrirlash", color = cs.onSurface, fontWeight = FontWeight.Bold)
                 }
-                Button(onClick = onDelete, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = cs.error.copy(alpha = 0.1f))) {
-                    Text("O'chirish", color = cs.error, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onDelete,
+                    enabled = !isLoading,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = cs.errorContainer)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = cs.error, strokeWidth = 2.dp)
+                    } else {
+                        Text("O'chirish", color = cs.error, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -284,12 +353,16 @@ private fun SelectableRow(title: String, isSelected: Boolean, onClick: () -> Uni
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) cs.onSurface.copy(alpha = 0.05f) else Color.Transparent,
-        border = if (isSelected) BorderStroke(1.dp, cs.onSurface.copy(alpha = 0.1f)) else null
+        color = if (isSelected) cs.primary.copy(alpha = 0.08f) else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.dp, cs.primary.copy(alpha = 0.3f)) else null
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-            if (isSelected) Icon(Icons.Outlined.Check, null, tint = cs.onSurface, modifier = Modifier.size(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium)
+            if (isSelected) Icon(Icons.Rounded.Check, null, tint = cs.primary, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -299,12 +372,14 @@ private fun StepIndicatorChip(text: String, isActive: Boolean, enabled: Boolean 
     val cs = MaterialTheme.colorScheme
     Surface(
         onClick = if (enabled) onClick else ({}),
-        shape = CircleShape,
+        shape = RoundedCornerShape(12.dp),
         color = if (isActive) cs.onSurface else cs.onSurface.copy(alpha = 0.05f),
         contentColor = if (isActive) cs.surface else cs.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.4f),
-        modifier = Modifier.height(36.dp)
+        modifier = Modifier.height(38.dp)
     ) {
-        Text(text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -318,13 +393,13 @@ private fun CustomColorInput(value: String, onConfirm: (String) -> Unit) {
             placeholder = { Text("Rangni yozing (masalan: jigarrang)") },
             shape = RoundedCornerShape(16.dp)
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         Button(
             onClick = { onConfirm(text) },
             enabled = text.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface)
-        ) { Text("Davom etish") }
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        ) { Text("Davom etish", fontWeight = FontWeight.Bold) }
     }
 }

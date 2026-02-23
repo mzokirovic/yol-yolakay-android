@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Yo\'l-Yo\'lakay</string>
+
+    <string name="nav_search">Search</string>
+    <string name="nav_publish">Publish</string>
+    <string name="nav_trips">Trips</string>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_profile">Profile</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_general">General</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_language">Language</string>
+
+    <string name="language_title">Language</string>
+    <string name="save">Save</string>
+
+    <string name="logout">Log out</string>
+    <string name="logout_confirm_title">Log out</string>
+    <string name="logout_confirm_body">Are you sure you want to log out?</string>
+    <string name="logout_confirm_yes">Yes, log out</string>
+    <string name="cancel">Cancel</string>
+</resources>

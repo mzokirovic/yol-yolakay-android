@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge // ✅ IMPORT QILINDI
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,8 @@ import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.example.yol_yolakay.core.i18n.LanguageStore
+import kotlinx.coroutines.runBlocking
 
 data class AppDeepLink(
     val notificationId: String? = null,
@@ -46,7 +49,7 @@ data class AppDeepLink(
     val body: String? = null
 )
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val deepLinkState = mutableStateOf<AppDeepLink?>(null)
     private lateinit var sessionStore: SessionStore
@@ -62,6 +65,13 @@ class MainActivity : ComponentActivity() {
 
         // ✅ ILova to'liq ekranga yoyildi (Edge to Edge dizayn)
         enableEdgeToEdge()
+
+        runBlocking {
+            val lang = LanguageStore(applicationContext).get()
+            if (!lang.isNullOrBlank()) {
+                LanguageStore.apply(lang)
+            }
+        }
 
         sessionStore = AppGraph.sessionStore(this)
         BackendClient.init(this, sessionStore)

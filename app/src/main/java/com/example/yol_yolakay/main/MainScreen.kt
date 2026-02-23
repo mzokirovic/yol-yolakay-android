@@ -4,16 +4,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -39,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
@@ -52,15 +55,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.example.yol_yolakay.AppDeepLink
+import com.example.yol_yolakay.R
 import com.example.yol_yolakay.core.session.SessionStore
 import com.example.yol_yolakay.feature.inbox.InboxHubScreen
 import com.example.yol_yolakay.feature.inbox.ThreadScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
-import com.example.yol_yolakay.feature.profile.language.LanguageScreen
-import com.example.yol_yolakay.feature.profile.payment.PaymentMethodsScreen
 import com.example.yol_yolakay.feature.profile.edit.ProfileEditScreen
 import com.example.yol_yolakay.feature.profile.home.ProfileScreen
+import com.example.yol_yolakay.feature.profile.language.LanguageScreen
+import com.example.yol_yolakay.feature.profile.payment.PaymentMethodsScreen
+import com.example.yol_yolakay.feature.profile.settings.SettingsScreen
 import com.example.yol_yolakay.feature.profile.vehicle.VehicleScreen
 import com.example.yol_yolakay.feature.publish.PublishScreen
 import com.example.yol_yolakay.feature.search.SearchScreen
@@ -97,11 +102,10 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // ✅ Oynani aniqlash va menyuni yashirish mantig'i
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // ✅ FAQAT shu 4 ta asosiy ekranda menyu ko'rinadi (Publish va boshqalarda yashirinadi)
+    // ✅ FAQAT shu 4 ta asosiy ekranda menyu ko'rinadi (Settings/Publish/... da yashirinadi)
     val showBottomBar = currentDestination?.let { dest ->
         dest.hasRoute(Screen.Search::class) ||
                 dest.hasRoute(Screen.MyTrips::class) ||
@@ -134,21 +138,26 @@ fun MainScreen(
         onDeepLinkHandled()
     }
 
-    val bottomNavItems = remember {
+    // ✅ Til o'zgarsa bottom nav label ham real o'zgaradi
+    val navSearch = stringResource(R.string.nav_search)
+    val navPublish = stringResource(R.string.nav_publish)
+    val navTrips = stringResource(R.string.nav_trips)
+    val navInbox = stringResource(R.string.nav_inbox)
+    val navProfile = stringResource(R.string.nav_profile)
+
+    val bottomNavItems = remember(navSearch, navPublish, navTrips, navInbox, navProfile) {
         listOf(
-            BottomNavItem("Qidiruv", Screen.Search, Icons.Filled.Search, Icons.Outlined.Search),
-            // ✅ Ikonka "AddCircle" dan "Add" (oddiy plyus) ga o'zgardi
-            BottomNavItem("E'lon", Screen.Publish, Icons.Filled.Add, Icons.Filled.Add),
-            BottomNavItem("Safarlar", Screen.MyTrips, Icons.Filled.DateRange, Icons.Outlined.DateRange),
-            BottomNavItem("Inbox", Screen.Inbox, Icons.Filled.Email, Icons.Outlined.Email),
-            BottomNavItem("Profil", Screen.Profile, Icons.Filled.Person, Icons.Outlined.Person),
+            BottomNavItem(navSearch, Screen.Search, Icons.Rounded.Search, Icons.Outlined.Search),
+            BottomNavItem(navPublish, Screen.Publish, Icons.Rounded.Add, Icons.Outlined.Add),
+            BottomNavItem(navTrips, Screen.MyTrips, Icons.Rounded.DirectionsCar, Icons.Outlined.DirectionsCar),
+            BottomNavItem(navInbox, Screen.Inbox, Icons.Rounded.Inbox, Icons.Outlined.Inbox),
+            BottomNavItem(navProfile, Screen.Profile, Icons.Rounded.Person, Icons.Outlined.Person),
         )
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            // ✅ Menyuni chiroyli tarzda pastga sirg'antirib yashirish
             AnimatedVisibility(
                 visible = showBottomBar,
                 enter = slideInVertically(initialOffsetY = { it }),
@@ -166,8 +175,9 @@ fun MainScreen(
         NavHost(
             navController = navController,
             startDestination = Screen.Search,
-            // ✅ Padding FAQAT menyu ochiq bo'lsagina beriladi, yo'qsa to'liq ekran bo'ladi
-            modifier = Modifier.padding(bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp)
+            modifier = Modifier.padding(
+                bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp
+            )
         ) {
 
             composable<Screen.Search> {
@@ -237,10 +247,19 @@ fun MainScreen(
             composable<Screen.Profile> {
                 ProfileScreen(onNavigate = { route -> navController.navigate(route) })
             }
+
             composable<Screen.ProfileEdit> { ProfileEditScreen(onBack = { navController.popBackStack() }) }
             composable<Screen.Vehicle> { VehicleScreen(onBack = { navController.popBackStack() }) }
             composable<Screen.Language> { LanguageScreen(onBack = { navController.popBackStack() }) }
             composable<Screen.PaymentMethods> { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
+
+            // ✅ Settings
+            composable<Screen.Settings> {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigate = { route -> navController.navigate(route) }
+                )
+            }
         }
     }
 }
@@ -253,9 +272,13 @@ private fun MainBottomBar(
     navController: NavHostController,
     items: List<BottomNavItem>,
     unreadCount: Int,
-    currentDestination: NavDestination? // ✅ Qo'shildi
+    currentDestination: NavDestination?
 ) {
     val cs = MaterialTheme.colorScheme
+
+    // ✅ hammasi 28
+    val iconSize = 28.dp
+    val publishIconSize = 28.dp
 
     Surface(color = cs.surface, shadowElevation = 10.dp) {
         NavigationBar(
@@ -263,7 +286,6 @@ private fun MainBottomBar(
             tonalElevation = 0.dp
         ) {
             items.forEach { item ->
-                // ✅ currentDestination ishlitilmoqda
                 val isSelected = when (item.route) {
                     Screen.Profile -> currentDestination.isProfileSection()
                     Screen.Inbox -> currentDestination.isInboxSection()
@@ -271,6 +293,8 @@ private fun MainBottomBar(
                 }
 
                 val iconVector = if (isSelected) item.selectedIcon else item.unselectedIcon
+                val currentIconSize = if (item.route == Screen.Publish) publishIconSize else iconSize
+
                 val badgeText = when {
                     unreadCount <= 0 -> null
                     unreadCount > 99 -> "99+"
@@ -290,10 +314,18 @@ private fun MainBottomBar(
                     icon = {
                         if (item.route == Screen.Inbox && badgeText != null) {
                             BadgedBox(badge = { Badge { Text(badgeText) } }) {
-                                Icon(iconVector, contentDescription = item.name)
+                                Icon(
+                                    imageVector = iconVector,
+                                    contentDescription = item.name,
+                                    modifier = Modifier.size(currentIconSize)
+                                )
                             }
                         } else {
-                            Icon(iconVector, contentDescription = item.name)
+                            Icon(
+                                imageVector = iconVector,
+                                contentDescription = item.name,
+                                modifier = Modifier.size(currentIconSize)
+                            )
                         }
                     },
                     colors = NavigationBarItemDefaults.colors(
@@ -321,5 +353,6 @@ private fun NavDestination?.isProfileSection(): Boolean =
                 dest.hasRoute(Screen.ProfileEdit::class) ||
                 dest.hasRoute(Screen.Vehicle::class) ||
                 dest.hasRoute(Screen.Language::class) ||
-                dest.hasRoute(Screen.PaymentMethods::class)
+                dest.hasRoute(Screen.PaymentMethods::class) ||
+                dest.hasRoute(Screen.Settings::class) // ✅ Settings ham Profile tabga tegishli
     } == true

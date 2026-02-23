@@ -1,5 +1,6 @@
 package com.example.yol_yolakay.feature.search.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,7 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.*
@@ -18,8 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-private val FieldRadius = 20.dp
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PassengersPickerField(
@@ -27,47 +26,49 @@ fun PassengersPickerField(
     onCountChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     min: Int = 1,
-    max: Int = 4,
-    label: String = "Yo‘lovchilar"
+    max: Int = 4
 ) {
     val cs = MaterialTheme.colorScheme
     var open by remember { mutableStateOf(false) }
 
+    // ✅ Premium Slim Tile Card
     Surface(
         modifier = modifier
-            .height(58.dp)
+            .fillMaxWidth()
+            .height(64.dp) // Kichraytirilgan nafis balandlik
             .clickable { open = true },
-        shape = RoundedCornerShape(FieldRadius),
-        color = cs.surfaceVariant.copy(alpha = 0.55f)
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.5f)),
+        color = cs.surface
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // ✅ Ikonka va Faint Blue orqa fon
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(cs.secondaryContainer),
+                    .background(cs.primary.copy(alpha = 0.08f)), // Faint Premium Blue
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Person,
+                    Icons.Outlined.PersonOutline,
                     contentDescription = null,
-                    tint = cs.onSecondaryContainer
+                    tint = cs.primary, // Ikonka Blue rangda
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                Text("Yo'lovchi", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
                 Text(
                     text = "$count kishi",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = cs.onSurface
                 )
             }
@@ -108,8 +109,8 @@ private fun PassengersSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp)
-            .padding(bottom = 22.dp)
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -117,7 +118,7 @@ private fun PassengersSheetContent(
         ) {
             Text(
                 text = "Necha yo‘lovchi?",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
                 color = cs.onSurface
@@ -127,12 +128,12 @@ private fun PassengersSheetContent(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(16.dp))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 26.dp),
+                .padding(vertical = 24.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -143,7 +144,7 @@ private fun PassengersSheetContent(
 
             Text(
                 text = count.toString(),
-                style = MaterialTheme.typography.displayLarge,
+                style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
                 color = cs.onSurface
             )
@@ -155,13 +156,11 @@ private fun PassengersSheetContent(
         }
 
         Text(
-            text = "1–4 kishi",
-            style = MaterialTheme.typography.bodySmall,
+            text = "Kabinada faqat ${max} kishi ketishi mumkin",
+            style = MaterialTheme.typography.bodyMedium,
             color = cs.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
-
-        Spacer(Modifier.height(14.dp))
     }
 }
 
@@ -174,10 +173,9 @@ private fun RoundControlButton(
     val cs = MaterialTheme.colorScheme
 
     Surface(
-        modifier = Modifier.size(52.dp),
+        modifier = Modifier.size(56.dp),
         shape = CircleShape,
-        color = cs.surfaceVariant.copy(alpha = if (enabled) 0.55f else 0.30f),
-        tonalElevation = 0.dp,
+        color = if (enabled) cs.onSurface.copy(alpha = 0.05f) else cs.outlineVariant.copy(alpha = 0.3f),
         onClick = onClick,
         enabled = enabled
     ) {

@@ -3,13 +3,12 @@ package com.example.yol_yolakay.navigation
 import kotlinx.serialization.Serializable
 
 sealed interface Screen {
-    @Serializable data object Search : Screen      // 1. Qidiruv formasi
-    @Serializable data object Publish : Screen     // 2. E'lon berish
-    @Serializable data object MyTrips : Screen     // 3. Safarlarim
-    @Serializable data object Inbox : Screen       // 4. Xabarlar
-    @Serializable data object Profile : Screen     // 5. Profil
+    @Serializable data object Search : Screen
+    @Serializable data object Publish : Screen
+    @Serializable data object MyTrips : Screen
+    @Serializable data object Inbox : Screen
+    @Serializable data object Profile : Screen
 
-    // 🔍 Qidiruv natijalari (Vertical Slice: Search ichida qoladi)
     @Serializable
     data class TripList(
         val from: String,
@@ -18,7 +17,6 @@ sealed interface Screen {
         val passengers: Int
     ) : Screen
 
-    // Hozir Auth AppRoot orqali ishlayapti, ammo o'chirmaymiz (sinmasin)
     @Serializable data object Login : Screen
 
     @Serializable data class TripDetails(val id: String) : Screen
@@ -28,6 +26,9 @@ sealed interface Screen {
     @Serializable data object Vehicle : Screen
     @Serializable data object Language : Screen
     @Serializable data object PaymentMethods : Screen
+
+    // ✅ YANGI: Sozlamalar
+    @Serializable data object Settings : Screen
 
     // Inbox / Chat
     @Serializable data class Thread(val id: String) : Screen

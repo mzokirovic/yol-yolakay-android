@@ -1,3 +1,26 @@
 <resources>
     <string name="app_name">Yo\'l-Yo\'lakay</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_search">Qidiruv</string>
+    <string name="nav_publish">E\'lon</string>
+    <string name="nav_trips">Safarlar</string>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_profile">Profil</string>
+
+    <!-- Settings / Language -->
+    <string name="settings_title">Sozlamalar</string>
+    <string name="settings_general">Umumiy</string>
+    <string name="settings_account">Hisob</string>
+    <string name="settings_language">Til</string>
+
+    <string name="language_title">Til</string>
+    <string name="save">Saqlash</string>
+
+    <!-- Logout -->
+    <string name="logout">Chiqish</string>
+    <string name="logout_confirm_title">Chiqish</string>
+    <string name="logout_confirm_body">Haqiqatan ham akkauntdan chiqmoqchimisiz?</string>
+    <string name="logout_confirm_yes">Ha, chiqish</string>
+    <string name="cancel">Bekor</string>
 </resources>
