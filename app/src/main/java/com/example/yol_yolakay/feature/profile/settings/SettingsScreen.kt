@@ -8,15 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +28,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    onLogoutSuccess: () -> Unit // 🚀 MUHIM: NavHost'ga xabar berish uchun callback qo'shdik
 ) {
     val ctx = LocalContext.current.applicationContext
     val sessionStore = remember { AppGraph.sessionStore(ctx) }
@@ -108,7 +101,8 @@ fun SettingsScreen(
                     onClick = {
                         loggingOut = true
                         scope.launch {
-                            sessionStore.clear()
+                            sessionStore.clear() // Xotiradan tozalaymiz
+                            onLogoutSuccess() // 🚀 NavHost'ga "Auth ga qayt" deb buyruq beramiz
                         }
                     }
                 ) { Text(if (loggingOut) "..." else stringResource(R.string.logout_confirm_yes)) }

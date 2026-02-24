@@ -99,9 +99,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Yangi intentni o'rnatamiz, shunda parseIntent to'g'ri o'qiydi
         setIntent(intent)
-        deepLinkState.value = parseIntent(intent)
-        markReadBestEffort(deepLinkState.value?.notificationId)
+        val newDeepLink = parseIntent(intent)
+        if (newDeepLink != null) {
+            deepLinkState.value = newDeepLink
+            markReadBestEffort(newDeepLink.notificationId)
+        }
     }
 
     private fun createNotificationChannel() {
@@ -125,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         val threadId = i.getStringExtra("thread_id")
         val tripId = i.getStringExtra("trip_id")
 
+        // Agar intent.extras null bo'lmasa tekshiramiz
         val rawOpenUpdates = i.getBooleanExtra("open_updates", false)
         val openUpdates = if (!threadId.isNullOrBlank() || !tripId.isNullOrBlank()) false else rawOpenUpdates
 
@@ -134,6 +139,12 @@ class MainActivity : AppCompatActivity() {
         if (notifId.isNullOrBlank() && threadId.isNullOrBlank() && tripId.isNullOrBlank() && !openUpdates) {
             return null
         }
+
+        // Qayta ishlab ketmasligi uchun intent extraslarini tozalab qo'yamiz
+        i.removeExtra("notification_id")
+        i.removeExtra("thread_id")
+        i.removeExtra("trip_id")
+        i.removeExtra("open_updates")
 
         return AppDeepLink(
             notificationId = notifId,

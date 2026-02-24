@@ -6,29 +6,51 @@ import com.example.yol_yolakay.core.network.model.NotificationApiModel
 object NotificationsStore {
 
     private const val PREF = "notif_sync"
-    private const val KEY_IDS = "shown_ids"
+    private const val KEY_IDS_CSV = "shown_ids_csv"
     private const val KEY_FCM = "fcm_token"
     private const val MAX = 50
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
+    // ✅ ordered list read
+    private fun readIds(ctx: Context): MutableList<String> {
+        val raw = prefs(ctx).getString(KEY_IDS_CSV, "").orEmpty().trim()
+        if (raw.isBlank()) return mutableListOf()
+        return raw.split("|")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toMutableList()
+    }
+
+    // ✅ ordered list write (limit guaranteed)
+    private fun writeIds(ctx: Context, ids: List<String>) {
+        val trimmed = if (ids.size <= MAX) ids else ids.takeLast(MAX)
+        prefs(ctx).edit().putString(KEY_IDS_CSV, trimmed.joinToString("|")).apply()
+    }
+
     fun filterNew(ctx: Context, unread: List<NotificationApiModel>): List<NotificationApiModel> {
-        val shown = prefs(ctx).getStringSet(KEY_IDS, emptySet()) ?: emptySet()
+        val shown = readIds(ctx).toHashSet()
         return unread.filterNot { shown.contains(it.id) }
     }
 
     fun remember(ctx: Context, shownNow: List<NotificationApiModel>) {
-        val p = prefs(ctx)
-        val current = (p.getStringSet(KEY_IDS, emptySet()) ?: emptySet()).toMutableSet()
-        shownNow.forEach { current.add(it.id) }
+        val ids = readIds(ctx)
 
-        // ✅ LIMIT (takeLast ishlatmaymiz)
-        val list = current.toList()
-        val trimmedList =
-            if (list.size <= MAX) list
-            else list.drop(list.size - MAX)
+        for (n in shownNow) {
+            // ✅ uniq + keep recent last
+            ids.remove(n.id)
+            ids.add(n.id)
+        }
 
-        p.edit().putStringSet(KEY_IDS, trimmedList.toSet()).apply()
+        writeIds(ctx, ids)
+    }
+
+    fun rememberId(ctx: Context, id: String) {
+        if (id.isBlank()) return
+        val ids = readIds(ctx)
+        ids.remove(id)
+        ids.add(id)
+        writeIds(ctx, ids)
     }
 
     fun saveFcmToken(ctx: Context, token: String) {
@@ -37,19 +59,4 @@ object NotificationsStore {
 
     fun getFcmToken(ctx: Context): String? =
         prefs(ctx).getString(KEY_FCM, null)
-
-
-    fun rememberId(ctx: Context, id: String) {
-        if (id.isBlank()) return
-        val p = prefs(ctx)
-        val current = (p.getStringSet(KEY_IDS, emptySet()) ?: emptySet()).toMutableSet()
-        current.add(id)
-
-        val list = current.toList()
-        val trimmed =
-            if (list.size <= MAX) list
-            else list.drop(list.size - MAX)
-
-        p.edit().putStringSet(KEY_IDS, trimmed.toSet()).apply()
-    }
 }

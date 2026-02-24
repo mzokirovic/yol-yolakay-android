@@ -63,7 +63,7 @@ import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsVmFactory
 import com.example.yol_yolakay.feature.profile.edit.ProfileEditScreen
 import com.example.yol_yolakay.feature.profile.home.ProfileScreen
-import com.example.yol_yolakay.feature.profile.language.LanguageScreen
+import com.example.yol_yolakay.feature.profile.settings.language.LanguageScreen
 import com.example.yol_yolakay.feature.profile.payment.PaymentMethodsScreen
 import com.example.yol_yolakay.feature.profile.settings.SettingsScreen
 import com.example.yol_yolakay.feature.profile.vehicle.VehicleScreen
@@ -254,10 +254,19 @@ fun MainScreen(
             composable<Screen.PaymentMethods> { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
 
             // ✅ Settings
+            // ✅ Settings (Logout mantiqi bilan)
             composable<Screen.Settings> {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onNavigate = { route -> navController.navigate(route) }
+                    onNavigate = { route -> navController.navigate(route) },
+                    onLogoutSuccess = {
+                        // 🚀 Eng muhim qator: Ilovadagi hamma narsani tozalaydi
+                        // va bosh ekranga (Search) otadi.
+                        // MainActivity dagi isLoggedIn flow buni sezib, avtomatik AuthScreen ni ochadi.
+                        navController.navigate(Screen.Search) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 )
             }
         }

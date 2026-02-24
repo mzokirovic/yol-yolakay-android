@@ -1,4 +1,4 @@
-package com.example.yol_yolakay.feature.profile.language
+package com.example.yol_yolakay.feature.profile.settings.language
 
 import android.content.Context
 import androidx.compose.foundation.clickable

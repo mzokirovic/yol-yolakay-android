@@ -5,7 +5,6 @@ import com.example.yol_yolakay.BuildConfig
 import com.example.yol_yolakay.core.session.CurrentUser
 import com.example.yol_yolakay.core.session.SessionStore
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -19,20 +18,23 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.encodedPath
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object BackendClient {
 
     private const val BASE_URL = "https://yol-yolakay-backend.onrender.com/"
 
     @Volatile private var _client: HttpClient? = null
-
-    // ✅ Auth plugin’siz raw client (refresh recursion bo‘lmasligi uchun)
     @Volatile private var _rawClient: HttpClient? = null
 
     private lateinit var sessionStore: SessionStore
@@ -63,9 +65,10 @@ object BackendClient {
         }
 
         install(HttpTimeout) {
-            connectTimeoutMillis = 15_000
-            requestTimeoutMillis = 30_000
-            socketTimeoutMillis = 30_000
+            // 🚀 MUHIM: Render.com uxlab qolsa uyg'onishi uchun 60 soniya beramiz
+            connectTimeoutMillis = 60_000
+            requestTimeoutMillis = 60_000
+            socketTimeoutMillis = 60_000
         }
 
         if (BuildConfig.DEBUG) {
@@ -96,9 +99,9 @@ object BackendClient {
         }
 
         install(HttpTimeout) {
-            connectTimeoutMillis = 15_000
-            requestTimeoutMillis = 30_000
-            socketTimeoutMillis = 30_000
+            connectTimeoutMillis = 60_000
+            requestTimeoutMillis = 60_000
+            socketTimeoutMillis = 60_000
         }
 
         if (BuildConfig.DEBUG) {
@@ -124,32 +127,43 @@ object BackendClient {
                     val refresh = sessionStore.refreshTokenCached()
                     if (refresh.isNullOrBlank()) return@refreshTokens null
 
-                    // ✅ MUHIM: refresh uchun Auth’siz raw client ishlatamiz
                     val raw = _rawClient ?: return@refreshTokens null
 
-                    val resp = raw.post("api/auth/refresh") {
-                        contentType(ContentType.Application.Json)
-                        setBody(mapOf("refresh_token" to refresh))
-                    }
+                    // 🚀 Xavfsiz tarmoq so'rovi (Exception otsa app qotmasligi uchun)
+                    val resp = runCatching {
+                        raw.post("api/auth/refresh") {
+                            contentType(ContentType.Application.Json)
+                            setBody(mapOf("refresh_token" to refresh))
+                        }
+                    }.getOrNull()
 
-                    if (!resp.status.isSuccess()) {
-                        // refresh ishlamasa sessionni tozalaymiz (nazoratli)
+                    // 1. Agar internet bo'lmasa yoki timeout bo'lsa, LOGOUT QILMAYMIZ! (null qaytaramiz)
+                    if (resp == null) return@refreshTokens null
+
+                    // 2. Agar token rostdan ham o'lgan bo'lsa (401 yoki 400), ana shundagina LOGOUT qilamiz
+                    if (resp.status == HttpStatusCode.Unauthorized || resp.status == HttpStatusCode.BadRequest) {
                         sessionStore.clear()
                         return@refreshTokens null
                     }
 
-                    val body =
-                        resp.body<com.example.yol_yolakay.feature.auth.AuthRemoteRepository.AuthResponse>()
+                    if (!resp.status.isSuccess()) return@refreshTokens null
 
-                    val newAccess = body.token ?: return@refreshTokens null
-                    val newRefresh = body.refreshToken ?: refresh
+                    // 3. Xavfsiz JSON parsing (Model classga qarab o'tirmaymiz)
+                    val bodyText = runCatching { resp.bodyAsText() }.getOrNull() ?: return@refreshTokens null
+                    val json = Json { ignoreUnknownKeys = true }
 
-                    sessionStore.save(newAccess, newRefresh, body.userId)
+                    val jsonObj = runCatching { json.parseToJsonElement(bodyText).jsonObject }.getOrNull() ?: return@refreshTokens null
+
+                    // Backenddagi snake_case nomlar bilan olamiz
+                    val newAccess = jsonObj["access_token"]?.jsonPrimitive?.contentOrNull ?: return@refreshTokens null
+                    val newRefresh = jsonObj["refresh_token"]?.jsonPrimitive?.contentOrNull ?: refresh
+                    val userId = jsonObj["user_id"]?.jsonPrimitive?.contentOrNull
+
+                    sessionStore.save(newAccess, newRefresh, userId)
 
                     BearerTokens(newAccess, newRefresh)
                 }
 
-                // Auth endpointlarda bearer yubormaymiz
                 sendWithoutRequest { req ->
                     !req.url.encodedPath.contains("/auth/")
                 }
@@ -159,8 +173,6 @@ object BackendClient {
         defaultRequest {
             url(BASE_URL)
             contentType(ContentType.Application.Json)
-
-            // ✅ Device/User headerlar
             header("X-Client-Id", CurrentUser.id(appContext))
             header("X-Device-Id", CurrentUser.deviceId(appContext))
         }
@@ -169,7 +181,6 @@ object BackendClient {
     fun reset() {
         _client?.close()
         _client = null
-
         _rawClient?.close()
         _rawClient = null
     }
