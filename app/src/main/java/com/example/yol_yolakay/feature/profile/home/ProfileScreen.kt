@@ -114,13 +114,21 @@ fun ProfileScreen(
                 ProfileHeader(
                     displayName = state.profile?.displayName ?: "Guest",
                     phone = state.profile?.phone ?: "Telefon yo‘q",
-                    ratingText = "5.00",
+                    ratingText = "5.0",
                     onAvatarClick = { showAvatarSheet = true },
-                    onHeaderClick = { onNavigate(Screen.ProfileEdit) }
+                    onHeaderClick = { onNavigate(Screen.ProfileEdit) },
+                    onRatingClick = { vm.showSoon("Ratinglar tizimi") }
                 )
             }
 
-            item { ProfileStats(trips = 24, passengers = 89) }
+            item {
+                ProfileStats(
+                    trips = 24,
+                    passengers = 89,
+                    onTripsClick = { vm.showSoon("Safarlar tarixi") },
+                    onPassengersClick = { vm.showSoon("Yo'lovchilar ro'yxati") }
+                )
+            }
 
             item {
                 HorizontalDivider(
@@ -169,7 +177,6 @@ fun ProfileScreen(
                 MenuDivider()
             }
 
-            // ✅ Sozlamalar endi alohida Settings screen
             item {
                 ProfileMenuRow(
                     icon = Icons.Rounded.Settings,
@@ -205,8 +212,6 @@ fun ProfileScreen(
                 )
                 MenuDivider()
             }
-
-            // ❌ "Chiqish" bu yerdan olib tashlandi (endi Settings ichida)
 
             item {
                 Spacer(Modifier.height(40.dp))
@@ -283,7 +288,8 @@ private fun ProfileHeader(
     phone: String,
     ratingText: String,
     onAvatarClick: () -> Unit,
-    onHeaderClick: () -> Unit
+    onHeaderClick: () -> Unit,
+    onRatingClick: () -> Unit // Yangi parametr
 ) {
     Row(
         modifier = Modifier
@@ -300,22 +306,32 @@ private fun ProfileHeader(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Rounded.Star,
-                    contentDescription = "Rating",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = ratingText,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            // 🚀 O'ZGARISH: Uber kabi Rating tugmasi
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), // Kulrang fon
+                modifier = Modifier.clickable { onRatingClick() }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = "Rating",
+                        tint = Color(0xFFFFC107), // Sariq yulduz
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = ratingText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -348,39 +364,55 @@ private fun ProfileHeader(
 }
 
 @Composable
-private fun ProfileStats(trips: Int, passengers: Int) {
+private fun ProfileStats(
+    trips: Int,
+    passengers: Int,
+    onTripsClick: () -> Unit,
+    onPassengersClick: () -> Unit
+) {
+    // 🚀 O'ZGARISH: Ilovaning Asosiy Ko'k rangi
+    val primaryBlue = MaterialTheme.colorScheme.primary
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(40.dp)
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .clickable { onTripsClick() }
+                .padding(vertical = 4.dp, horizontal = 4.dp) // Bosish maydonini kattalashtirish
+        ) {
             Text(
                 text = trips.toString(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = primaryBlue // Ko'k rang
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "Safarlar",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = primaryBlue // Ko'k rang
             )
         }
-        Column {
+        Column(
+            modifier = Modifier
+                .clickable { onPassengersClick() }
+                .padding(vertical = 4.dp, horizontal = 4.dp) // Bosish maydonini kattalashtirish
+        ) {
             Text(
                 text = passengers.toString(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = primaryBlue // Ko'k rang
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "Yo'lovchilar",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = primaryBlue // Ko'k rang
             )
         }
     }
