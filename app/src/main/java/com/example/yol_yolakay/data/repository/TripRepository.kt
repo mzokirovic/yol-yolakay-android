@@ -59,6 +59,24 @@ class TripRepository {
         val max: Double
     )
 
+    @Serializable
+    data class RoutePreviewRequest(
+        val fromLat: Double,
+        val fromLng: Double,
+        val toLat: Double,
+        val toLng: Double
+    )
+
+    @Serializable
+    data class RoutePreviewResponse(
+        val success: Boolean,
+        val provider: String = "unknown",
+        val polyline: String? = null,  // encoded polyline (precision=5)
+        val distanceKm: Int = 0,
+        val durationMin: Int = 0,
+        val error: String? = null
+    )
+
     // --- ERROR PARSER (FINAL) ---
     private val errJson = Json {
         ignoreUnknownKeys = true
@@ -120,6 +138,19 @@ class TripRepository {
         Result.failure(e)
     }
 
+
+    suspend fun getRoutePreview(
+        fromLat: Double, fromLng: Double, toLat: Double, toLng: Double
+    ): Result<RoutePreviewResponse> = try {
+        val resp = client.post("api/trips/calculate-route") {
+            contentType(ContentType.Application.Json)
+            setBody(RoutePreviewRequest(fromLat, fromLng, toLat, toLng))
+        }
+        resp.bodyOrFail("RoutePreview")
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     suspend fun getPopularPoints(city: String? = null): Result<List<LocationModel>> = try {
         val resp = client.get("api/trips/points") {
             if (!city.isNullOrBlank()) parameter("city", city)
@@ -140,8 +171,8 @@ class TripRepository {
     } catch (e: Exception) {
         // MVP fallback (offline/demo)
         val mockPoints = listOf(
-            LocationModel("Toshkent (Olmazor Metro)", 41.2858, 69.2040, "mock_1", "Toshkent shahri"),
-            LocationModel("Toshkent (Qo'yliq)", 41.2345, 69.3456, "mock_2", "Toshkent shahri")
+            LocationModel("Toshkent (Olmazor Metro)", 41.2858, 69.2040, null, "Toshkent shahri"),
+            LocationModel("Toshkent (Qo'yliq)", 41.2345, 69.3456, null, "Toshkent shahri")
         )
         Result.success(mockPoints)
     }

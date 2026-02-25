@@ -82,6 +82,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -810,8 +812,10 @@ private fun SecondaryButton(text: String, isBusy: Boolean, onClick: () -> Unit) 
     }
 }
 
-private fun parseDeparture(raw: String): OffsetDateTime? =
-    runCatching { OffsetDateTime.parse(raw) }.getOrNull()
+private fun parseDeparture(raw: String): ZonedDateTime? =
+    runCatching {
+        OffsetDateTime.parse(raw).atZoneSameInstant(ZoneId.systemDefault())
+    }.getOrNull()
 
 private fun normalizeStatus(raw: String?): String {
     val s = (raw ?: "active").trim().lowercase()

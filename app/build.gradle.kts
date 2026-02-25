@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,22 @@ plugins {
 
     id("com.google.gms.google-services")
 }
+
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+val mapsApiKey: String =
+    (project.findProperty("MAPS_API_KEY") as String?)
+        ?.takeIf { it.isNotBlank() }
+        ?: localProps.getProperty("MAPS_API_KEY")
+            ?.takeIf { it.isNotBlank() }
+        ?: System.getenv("MAPS_API_KEY")
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
+
 
 android {
     namespace = "com.example.yol_yolakay"
@@ -20,8 +38,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        manifestPlaceholders["MAPS_API_KEY"] = (project.findProperty("MAPS_API_KEY") as String?) ?: ""
-
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
@@ -54,6 +71,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation("com.google.maps.android:maps-compose-utils:4.3.3")
+
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("io.ktor:ktor-client-auth:2.3.12")

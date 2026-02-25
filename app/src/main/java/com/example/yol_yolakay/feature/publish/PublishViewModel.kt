@@ -3,12 +3,15 @@ package com.example.yol_yolakay.feature.publish
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.data.repository.TripRepository
+import com.example.yol_yolakay.feature.publish.components.PolylineDecoder
 import com.example.yol_yolakay.feature.publish.model.PublishTripRequest
+import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class PublishViewModel : ViewModel() {
 
@@ -16,6 +19,8 @@ class PublishViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(PublishUiState())
     val uiState = _uiState.asStateFlow()
+
+    private var lastRouteKey: String? = null
 
     init {
         loadPopularPoints()
@@ -29,7 +34,63 @@ class PublishViewModel : ViewModel() {
         viewModelScope.launch {
             repository.getPopularPoints()
                 .onSuccess { points -> _uiState.update { it.copy(popularPoints = points) } }
-                .onFailure { /* xohlasangiz error state qo‘shamiz */ }
+                .onFailure { /* optional */ }
+        }
+    }
+
+    private fun routeKey(f: LocationModel, t: LocationModel): String =
+        String.format(Locale.US, "%.5f,%.5f|%.5f,%.5f", f.lat, f.lng, t.lat, t.lng)
+
+    private fun loadRoutePreviewIfPossible() {
+        val draft = _uiState.value.draft
+        val f = draft.fromLocation ?: return
+        val t = draft.toLocation ?: return
+
+        val key = routeKey(f, t)
+        if (key == lastRouteKey && _uiState.value.routePreview.hasRoute) return
+        lastRouteKey = key
+
+        _uiState.update {
+            it.copy(routePreview = it.routePreview.copy(isLoading = true, error = null))
+        }
+
+        viewModelScope.launch {
+            repository.getRoutePreview(f.lat, f.lng, t.lat, t.lng)
+                .onSuccess { res ->
+                    val decoded = res.polyline?.let { PolylineDecoder.decode(it) }.orEmpty()
+
+                    val points = if (decoded.size >= 2) decoded else listOf(
+                        LatLng(f.lat, f.lng),
+                        LatLng(t.lat, t.lng)
+                    )
+
+                    _uiState.update { state ->
+                        state.copy(
+                            routePreview = RoutePreviewState(
+                                points = points,
+                                provider = res.provider,
+                                distanceKm = res.distanceKm,
+                                durationMin = res.durationMin,
+                                isLoading = false,
+                                error = res.error
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    // fallback: straight line
+                    val points = listOf(LatLng(f.lat, f.lng), LatLng(t.lat, t.lng))
+                    _uiState.update { state ->
+                        state.copy(
+                            routePreview = state.routePreview.copy(
+                                points = points,
+                                provider = "line",
+                                isLoading = false,
+                                error = e.message
+                            )
+                        )
+                    }
+                }
         }
     }
 
@@ -72,7 +133,9 @@ class PublishViewModel : ViewModel() {
         if (cur < steps.lastIndex) {
             val next = steps[cur + 1]
             _uiState.update { it.copy(currentStep = next, publishError = null) }
+
             if (next == PublishStep.PRICE) loadPriceSuggestion()
+            if (next == PublishStep.PREVIEW) loadRoutePreviewIfPossible()
         } else {
             onPublish()
         }
@@ -86,15 +149,18 @@ class PublishViewModel : ViewModel() {
     fun goToStep(step: PublishStep) {
         _uiState.update { it.copy(currentStep = step, publishError = null) }
         if (step == PublishStep.PRICE) loadPriceSuggestion()
+        if (step == PublishStep.PREVIEW) loadRoutePreviewIfPossible()
     }
 
     fun onFromSelected(loc: LocationModel) {
         updateDraft { it.copy(fromLocation = loc) }
+        loadRoutePreviewIfPossible()
         onNext()
     }
 
     fun onToSelected(loc: LocationModel) {
         updateDraft { it.copy(toLocation = loc) }
+        loadRoutePreviewIfPossible()
         onNext()
     }
 
@@ -115,7 +181,6 @@ class PublishViewModel : ViewModel() {
     private fun onPublish() {
         val state = _uiState.value
 
-        // ✅ Global validation (PREVIEW’da ham vaqt o‘tib ketishi mumkin)
         state.publishValidationMessage?.let { msg ->
             _uiState.update { it.copy(publishError = msg, isPublishing = false) }
             return
@@ -162,6 +227,7 @@ class PublishViewModel : ViewModel() {
     }
 
     fun resetAfterPublish() {
+        lastRouteKey = null
         _uiState.value = PublishUiState()
         loadPopularPoints()
     }

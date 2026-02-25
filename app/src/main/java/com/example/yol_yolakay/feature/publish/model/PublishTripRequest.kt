@@ -8,13 +8,13 @@ data class PublishTripRequest(
     val fromLat: Double,
     val fromLng: Double,
     val fromPointId: String? = null,
-    val fromRegion: String? = null,     // ✅ NEW
+    val fromRegion: String? = null,
 
     val toLocation: String,
     val toLat: Double,
     val toLng: Double,
     val toPointId: String? = null,
-    val toRegion: String? = null,       // ✅ NEW
+    val toRegion: String? = null,
 
     val date: String,
     val time: String,

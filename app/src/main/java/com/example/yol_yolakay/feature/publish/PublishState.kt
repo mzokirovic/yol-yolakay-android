@@ -1,5 +1,6 @@
 package com.example.yol_yolakay.feature.publish
 
+import com.google.android.gms.maps.model.LatLng
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
@@ -36,6 +37,17 @@ data class PriceSuggestionState(
     val recommendedLong: Long get() = recommended.toLong()
 }
 
+data class RoutePreviewState(
+    val points: List<LatLng> = emptyList(),
+    val provider: String? = null,
+    val distanceKm: Int = 0,
+    val durationMin: Int = 0,
+    val isLoading: Boolean = false,
+    val error: String? = null
+) {
+    val hasRoute: Boolean get() = points.size >= 2
+}
+
 /**
  * ✅ 3) Asosiy UI state
  */
@@ -46,7 +58,8 @@ data class PublishUiState(
     val popularPoints: List<LocationModel> = emptyList(),
     val isPublishing: Boolean = false,
     val publishError: String? = null,
-    val isPublished: Boolean = false
+    val isPublished: Boolean = false,
+    val routePreview: RoutePreviewState = RoutePreviewState()
 ) {
     // ---------- UI helpers ----------
     val progress: Float

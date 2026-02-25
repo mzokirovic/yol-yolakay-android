@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.yol_yolakay.core.network.model.TripApiModel
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,7 +32,9 @@ fun TripItem(
 ) {
     val depTime = remember(trip.departureTime) {
         runCatching {
-            OffsetDateTime.parse(trip.departureTime)
+            OffsetDateTime
+                .parse(trip.departureTime)
+                .atZoneSameInstant(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("HH:mm"))
         }.getOrNull() ?: "--:--"
     }

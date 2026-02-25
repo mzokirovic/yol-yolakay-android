@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.core.network.model.TripApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private enum class MyTripsTab { DRIVER, PASSENGER }
@@ -158,6 +159,7 @@ private fun TripCard(
     val depTime = remember(trip.departureTime) {
         runCatching {
             OffsetDateTime.parse(trip.departureTime)
+                .atZoneSameInstant(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("HH:mm"))
         }.getOrNull() ?: "--:--"
     }
@@ -165,9 +167,11 @@ private fun TripCard(
     val arrTime = remember(trip.departureTime, trip.durationMin) {
         val min = trip.durationMin
         if (min == null || min <= 0) return@remember null
+
         runCatching {
             OffsetDateTime.parse(trip.departureTime)
                 .plusMinutes(min.toLong())
+                .atZoneSameInstant(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("HH:mm"))
         }.getOrNull()
     }
