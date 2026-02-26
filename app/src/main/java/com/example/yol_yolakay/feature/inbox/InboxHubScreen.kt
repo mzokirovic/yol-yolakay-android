@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,11 +16,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.yol_yolakay.feature.notifications.NotificationsScreen
 import com.example.yol_yolakay.feature.notifications.NotificationsViewModel
 
@@ -37,6 +36,9 @@ fun InboxHubScreen(
     var tab by rememberSaveable { mutableStateOf(InboxTab.CHATS) }
     val cs = MaterialTheme.colorScheme
 
+    // ✅ MUHIM: Inbox VM’ni HUB darajasida yaratamiz — tab switchda qayta yaratilmaydi
+    val inboxVm: InboxViewModel = viewModel(factory = InboxViewModel.factory())
+
     LaunchedEffect(openUpdatesSignal) {
         if (openUpdatesSignal > 0) {
             tab = InboxTab.NOTIFS
@@ -47,7 +49,6 @@ fun InboxHubScreen(
     val unread = notifVm.state.unreadCount
 
     Column(Modifier.fillMaxSize().background(cs.background)) {
-        // ✅ Premium Header (MyTrips bilan bir xil clean style)
         Surface(
             color = cs.background,
             modifier = Modifier.statusBarsPadding()
@@ -66,14 +67,16 @@ fun InboxHubScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // ✅ MyTrips bilan bir xil selektor
                 SegmentedSelector(
                     selectedIndex = if (tab == InboxTab.CHATS) 0 else 1,
                     items = listOf("Chatlar", "Bildirishnomalar"),
                     badgeCount = if (tab == InboxTab.CHATS) 0 else unread,
                     onSelectionChange = {
-                        if (it == 0) tab = InboxTab.CHATS
-                        else {
+                        if (it == 0) {
+                            tab = InboxTab.CHATS
+                            // ✅ ixtiyoriy: chatsga qaytganda refresh qilmoqchi bo‘lsang:
+                            // inboxVm.refresh()
+                        } else {
                             tab = InboxTab.NOTIFS
                             notifVm.refresh()
                         }
@@ -82,10 +85,13 @@ fun InboxHubScreen(
             }
         }
 
-        // Content
         Box(modifier = Modifier.fillMaxSize()) {
             when (tab) {
-                InboxTab.CHATS -> InboxScreen(onOpenThread = onOpenThread)
+                InboxTab.CHATS -> InboxScreen(
+                    onOpenThread = onOpenThread,
+                    vm = inboxVm // ✅ endi VM qayta yaratilmaydi
+                )
+
                 InboxTab.NOTIFS -> NotificationsScreen(
                     onOpenTrip = onOpenTrip,
                     onOpenThread = onOpenThread,
@@ -119,7 +125,6 @@ private fun SegmentedSelector(
             label = "selector"
         )
 
-        // Sliding indicator
         Box(
             modifier = Modifier
                 .offset(x = indicatorOffset)
@@ -148,7 +153,6 @@ private fun SegmentedSelector(
                         ) { onSelectionChange(index) },
                     contentAlignment = Alignment.Center
                 ) {
-                    // ✅ Matn buzilmasligi uchun Row ichida Badge va Text'ni markazlaymiz
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
@@ -158,10 +162,9 @@ private fun SegmentedSelector(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = textColor,
-                            maxLines = 1 // Matn buzilib ketmasligi uchun
+                            maxLines = 1
                         )
 
-                        // ✅ Agar bildirishnoma bo'lsa, matn yonida kichik nuqta yoki raqam
                         if (index == 1 && badgeCount > 0) {
                             Spacer(Modifier.width(6.dp))
                             Surface(

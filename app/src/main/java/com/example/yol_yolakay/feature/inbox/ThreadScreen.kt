@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
@@ -30,9 +29,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.network.model.MessageApiModel
 import com.example.yol_yolakay.core.session.CurrentUser
+import com.example.yol_yolakay.ui.components.AppCircularLoading
+import com.example.yol_yolakay.ui.components.AppPullRefreshIndicator
 import kotlinx.coroutines.launch
 
-// --- UI State ---
 data class ThreadState(
     val isLoading: Boolean = true,
     val messages: List<MessageApiModel> = emptyList(),
@@ -40,7 +40,6 @@ data class ThreadState(
     val input: String = ""
 )
 
-// --- ViewModel ---
 class ThreadViewModel(
     private val userId: String,
     private val repo: InboxRemoteRepository,
@@ -89,7 +88,6 @@ class ThreadViewModel(
     }
 }
 
-// --- Main Screen ---
 @OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ThreadScreen(
@@ -102,13 +100,29 @@ fun ThreadScreen(
     val cs = MaterialTheme.colorScheme
     val myId = remember(context) { CurrentUser.id(context) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // xatolarni snackbar qilib ko'rsatamiz
+    var lastSnackError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(s.error) {
+        val err = s.error
+        if (!err.isNullOrBlank() && err != lastSnackError) {
+            lastSnackError = err
+            snackbarHostState.showSnackbar(err)
+        }
+    }
+
+    val hasData = s.messages.isNotEmpty()
+    val isInitialLoading = s.isLoading && !hasData
+
     val pullState = rememberPullRefreshState(
-        refreshing = s.isLoading,
+        refreshing = s.isLoading && hasData,
         onRefresh = { vm.refresh() }
     )
 
     Scaffold(
         containerColor = cs.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -120,10 +134,7 @@ fun ThreadScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -138,9 +149,16 @@ fun ThreadScreen(
                 .fillMaxSize()
                 .pullRefresh(pullState)
         ) {
+            // ✅ Initial loading: faqat 1 ta loader
+            if (isInitialLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AppCircularLoading()
+                }
+                return@Box
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // 1. Xabarlar ro'yxati
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -153,7 +171,6 @@ fun ThreadScreen(
                     }
                 }
 
-                // 2. Premium Composer (Xabar yozish joyi)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = cs.surface,
@@ -162,8 +179,8 @@ fun ThreadScreen(
                     Row(
                         modifier = Modifier
                             .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .navigationBarsPadding() // Tizim tugmalari ustida turadi
-                            .imePadding(), // Klaviatura ochilganda yuqoriga ko'tariladi
+                            .navigationBarsPadding()
+                            .imePadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
@@ -183,21 +200,21 @@ fun ThreadScreen(
 
                         Spacer(Modifier.width(12.dp))
 
-                        // Yuborish tugmasi
                         IconButton(
                             onClick = vm::send,
-                            enabled = s.input.isNotBlank(),
+                            enabled = s.input.isNotBlank() && !s.isLoading,
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (s.input.isNotBlank()) cs.onSurface else cs.outlineVariant.copy(alpha = 0.5f)
+                                    if (s.input.isNotBlank() && !s.isLoading) cs.onSurface
+                                    else cs.outlineVariant.copy(alpha = 0.5f)
                                 )
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Send,
                                 contentDescription = "Send",
-                                tint = if (s.input.isNotBlank()) cs.surface else cs.onSurfaceVariant,
+                                tint = if (s.input.isNotBlank() && !s.isLoading) cs.surface else cs.onSurfaceVariant,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -205,17 +222,20 @@ fun ThreadScreen(
                 }
             }
 
-            // Yangilash indikatori
-            PullRefreshIndicator(
-                refreshing = s.isLoading,
-                state = pullState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
+            // ✅ Pull indicator: faqat data bor paytda (double yo'q)
+            if (hasData) {
+                AppPullRefreshIndicator(
+                    refreshing = s.isLoading,
+                    state = pullState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    contentColor = cs.onSurface,
+                    backgroundColor = cs.surface
+                )
+            }
         }
     }
 }
 
-// --- Xabar pufakchasi ---
 @Composable
 private fun MessageBubble(text: String, isMine: Boolean) {
     val cs = MaterialTheme.colorScheme

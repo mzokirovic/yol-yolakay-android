@@ -1,25 +1,22 @@
 package com.example.yol_yolakay.feature.inbox
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,8 +25,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.example.yol_yolakay.core.network.model.ThreadApiModel
+import com.example.yol_yolakay.ui.components.AppCircularLoading
+import com.example.yol_yolakay.ui.components.AppPullRefreshIndicator
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
 
 data class InboxState(
     val isLoading: Boolean = true,
@@ -45,11 +43,15 @@ class InboxViewModel(private val repo: InboxRemoteRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            // Pull refresh paytida ham loading true bo‘ladi
             state = state.copy(isLoading = true, error = null)
             runCatching { repo.listThreads() }
-                .onSuccess { list -> state = state.copy(isLoading = false, threads = list) }
-                .onFailure { e -> state = state.copy(isLoading = false, error = e.message ?: "Xatolik") }
+                .onSuccess { list ->
+                    state = state.copy(isLoading = false, threads = list, error = null)
+                }
+                .onFailure { e ->
+                    // data bo'lsa ham list ushlab qolamiz
+                    state = state.copy(isLoading = false, error = e.message ?: "Xatolik")
+                }
         }
     }
 
@@ -71,10 +73,24 @@ fun InboxScreen(
     vm: InboxViewModel = viewModel(factory = InboxViewModel.factory())
 ) {
     val s = vm.state
+    val cs = MaterialTheme.colorScheme
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // ✅ Pull-to-refresh state
+    val hasData = s.threads.isNotEmpty()
+    val isInitialLoading = s.isLoading && !hasData
+
+    // data bor bo'lsa xatoni snackbar qilib chiqaramiz
+    var lastSnackError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(s.error, hasData) {
+        val err = s.error
+        if (hasData && !err.isNullOrBlank() && err != lastSnackError) {
+            lastSnackError = err
+            snackbarHostState.showSnackbar(err)
+        }
+    }
+
     val pullState = rememberPullRefreshState(
-        refreshing = s.isLoading,
+        refreshing = s.isLoading && hasData, // ✅ faqat list bo'lganda pull refresh
         onRefresh = { vm.refresh() }
     )
 
@@ -83,37 +99,43 @@ fun InboxScreen(
             .fillMaxSize()
             .pullRefresh(pullState)
     ) {
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            // ✅ Header — refresh tugmasiz
             Text(
                 text = "Chatlar",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = 12.dp),
+                color = cs.onSurface
             )
 
             Spacer(Modifier.height(12.dp))
 
             when {
-                s.error != null -> {
-                    ErrorState(
-                        message = s.error!!,
-                        onRetry = { vm.refresh() }
-                    )
+                // ✅ Initial loading: faqat 1 ta loader
+                isInitialLoading -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        AppCircularLoading()
+                    }
                 }
 
-                !s.isLoading && s.threads.isEmpty() -> {
+                // ✅ Data yo'q + error: full error
+                !hasData && s.error != null -> {
+                    ErrorState(message = s.error!!, onRetry = { vm.refresh() })
+                }
+
+                // ✅ Empty
+                !s.isLoading && !hasData -> {
                     EmptyState(
                         title = "Hali chatlar yo‘q",
                         subtitle = "Safar e’lonlaridan chat boshlang — hammasi shu yerda ko‘rinadi."
                     )
                 }
 
+                // ✅ Data bor: list doim ko‘rinadi
                 else -> {
                     ThreadsList(
                         threads = s.threads,
@@ -123,13 +145,22 @@ fun InboxScreen(
             }
         }
 
-        // ✅ Indicator (tepa markazda)
-        PullRefreshIndicator(
-            refreshing = s.isLoading,
-            state = pullState,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
+        // ✅ Pull indicator: faqat data bor paytda ko'rsatamiz (double loader yo'q)
+        if (hasData) {
+            AppPullRefreshIndicator(
+                refreshing = s.isLoading,
+                state = pullState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+                contentColor = cs.onSurface,
+                backgroundColor = cs.surface
+            )
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }
@@ -146,16 +177,14 @@ private fun ThreadsList(
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        LazyColumn(
-            contentPadding = PaddingValues(vertical = 6.dp)
-        ) {
+        LazyColumn(contentPadding = PaddingValues(vertical = 6.dp)) {
             items(threads, key = { it.id }) { t ->
                 ThreadRowModern(
                     title = t.otherUserName ?: (t.otherUserId ?: "Foydalanuvchi"),
                     subtitle = t.lastMessage ?: "Xabar yo‘q",
                     onClick = { onOpenThread(t.id) }
                 )
-                Divider(
+                HorizontalDivider(
                     thickness = 1.dp,
                     color = cs.outline.copy(alpha = 0.10f),
                     modifier = Modifier.padding(start = 72.dp)
@@ -172,6 +201,7 @@ private fun ThreadRowModern(
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+
     Surface(
         onClick = onClick,
         color = Color.Transparent,
@@ -181,7 +211,6 @@ private fun ThreadRowModern(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ✅ Modern Monogram Avatar
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -218,7 +247,8 @@ private fun ThreadRowModern(
             }
 
             Icon(
-                Icons.Outlined.ChevronRight, null,
+                Icons.Outlined.ChevronRight,
+                contentDescription = null,
                 tint = cs.outlineVariant,
                 modifier = Modifier.size(20.dp)
             )

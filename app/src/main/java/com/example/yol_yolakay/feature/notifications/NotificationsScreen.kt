@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Notifications
@@ -14,8 +18,6 @@ import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +49,7 @@ class NotificationsVmFactory(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
     onOpenTrip: (String) -> Unit,
@@ -65,10 +67,16 @@ fun NotificationsScreen(
     LaunchedEffect(isLoggedIn) { vm.onLoginState(isLoggedIn) }
 
     val state = vm.state
-    val pullState = rememberPullToRefreshState()
+    val cs = MaterialTheme.colorScheme
+
+    // ✅ M2 Pull-to-refresh (Inbox bilan bir xil)
+    val pullState = rememberPullRefreshState(
+        refreshing = state.isLoading,
+        onRefresh = { vm.refresh() }
+    )
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = cs.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -76,7 +84,7 @@ fun NotificationsScreen(
                         text = "Bildirishnomalar",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = cs.onBackground
                     )
                 },
                 actions = {
@@ -86,20 +94,16 @@ fun NotificationsScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.background)
             )
         }
     ) { padding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .pullToRefresh(
-                    isRefreshing = state.isLoading,
-                    onRefresh = { vm.refresh() },
-                    state = pullState,
-                    enabled = state.isLoggedIn
-                )
+                .pullRefresh(pullState) // ✅
         ) {
             when {
                 !state.isLoggedIn -> LoggedOutState()
@@ -111,7 +115,8 @@ fun NotificationsScreen(
 
                 state.items.isEmpty() && state.isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        // ✅ Rangni bir xil qilish: ko'k bo'lmasin desang onSurface qilamiz
+                        CircularProgressIndicator(color = cs.onSurface)
                     }
                 }
 
@@ -120,31 +125,27 @@ fun NotificationsScreen(
                 else -> NotificationsList(
                     items = state.items,
                     onClick = { n ->
-                        // 🚀 1. O'qilgan deb belgilaymiz
                         vm.markRead(n.id)
-
-                        // 🚀 2. To'g'ridan-to'g'ri kerakli ekranga o'tamiz (Dialogsiz)
-                        if (!n.threadId.isNullOrBlank()) {
-                            onOpenThread(n.threadId)
-                        } else if (!n.tripId.isNullOrBlank()) {
-                            onOpenTrip(n.tripId)
-                        }
+                        if (!n.threadId.isNullOrBlank()) onOpenThread(n.threadId)
+                        else if (!n.tripId.isNullOrBlank()) onOpenTrip(n.tripId)
                     }
                 )
             }
 
-            if (state.isLoggedIn && state.isLoading) {
-                LinearProgressIndicator(
-                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            // ✅ Yuqoridagi refresh indikatori (Inbox bilan bir xil)
+            PullRefreshIndicator(
+                refreshing = state.isLoading,
+                state = pullState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 }
 
+// Qolgan funksiyalar (NotificationsList, NotificationRow, LoggedOutState, ErrorState, EmptyState, relativeTimeUz) o'zgarishsiz qoladi.
+
 // ─────────────────────────────────────────────────────────────────────────────
-// PREMIUM UI KOMPONENTLARI
+// UI
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -161,7 +162,7 @@ private fun NotificationsList(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp) // Bottom padding navigatsiya uchun
+        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
     ) {
         items(sorted, key = { it.id }) { n ->
             NotificationRow(n = n, onClick = { onClick(n) })
@@ -182,14 +183,15 @@ private fun NotificationRow(
     val cs = MaterialTheme.colorScheme
     val timeText = remember(n.createdAt) { relativeTimeUz(n.createdAt) }
 
-    // Xabar turiga qarab icon va rang tanlash
     val (icon, iconBgColor, iconTintColor) = when {
-        !n.threadId.isNullOrBlank() -> Triple(Icons.Rounded.ChatBubbleOutline, Color(0xFFE3F2FD), Color(0xFF1976D2)) // Blue for chat
-        !n.tripId.isNullOrBlank() -> Triple(Icons.Rounded.DirectionsCar, Color(0xFFE8F5E9), Color(0xFF388E3C)) // Green for rides
-        else -> Triple(Icons.Rounded.Info, Color(0xFFF5F5F5), Color(0xFF616161)) // Gray for general
+        !n.threadId.isNullOrBlank() ->
+            Triple(Icons.Rounded.ChatBubbleOutline, Color(0xFFE3F2FD), Color(0xFF1976D2))
+        !n.tripId.isNullOrBlank() ->
+            Triple(Icons.Rounded.DirectionsCar, Color(0xFFE8F5E9), Color(0xFF388E3C))
+        else ->
+            Triple(Icons.Rounded.Info, Color(0xFFF5F5F5), Color(0xFF616161))
     }
 
-    // O'qilmagan xabarlar fonini sal farqlash
     val backgroundColor = if (!n.isRead) cs.primary.copy(alpha = 0.04f) else Color.Transparent
 
     Row(
@@ -200,7 +202,6 @@ private fun NotificationRow(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.Top
     ) {
-        // Ikonka qismi
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -210,7 +211,6 @@ private fun NotificationRow(
         ) {
             Icon(imageVector = icon, contentDescription = null, tint = iconTintColor, modifier = Modifier.size(24.dp))
 
-            // Unread Blue Dot
             if (!n.isRead) {
                 Box(
                     modifier = Modifier
@@ -228,7 +228,6 @@ private fun NotificationRow(
 
         Spacer(Modifier.width(16.dp))
 
-        // Text qismi
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -267,9 +266,6 @@ private fun NotificationRow(
     }
 }
 
-// Qolgan yordamchi funksiyalar (LoggedOutState, EmptyState, relativeTimeUz) o'zgarishsiz qoldi.
-// Ular pastda xuddi avvalgidek qolaveradi.
-
 @Composable
 private fun LoggedOutState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -298,7 +294,12 @@ private fun EmptyState() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
             Spacer(Modifier.height(16.dp))
-            Text("Hozircha bildirishnomalar yo‘q", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
+            Text(
+                "Hozircha bildirishnomalar yo‘q",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Gray
+            )
         }
     }
 }

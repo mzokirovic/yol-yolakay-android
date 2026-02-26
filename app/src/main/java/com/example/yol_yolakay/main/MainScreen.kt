@@ -1,12 +1,14 @@
 package com.example.yol_yolakay.main
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Person
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,15 +31,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -90,6 +87,9 @@ fun MainScreen(
     val navController = rememberNavController()
     val ctx = LocalContext.current
 
+    // ✅ Global online/offline
+    val isOnline by com.example.yol_yolakay.core.network.rememberIsOnline()
+
     val notifVm: NotificationsViewModel = viewModel(factory = NotificationsVmFactory(ctx))
 
     val sessionStore = remember { SessionStore(ctx.applicationContext) }
@@ -124,12 +124,8 @@ fun MainScreen(
         }
 
         when {
-            !dl.threadId.isNullOrBlank() -> {
-                navController.navigate(Screen.Thread(dl.threadId)) { launchSingleTop = true }
-            }
-            !dl.tripId.isNullOrBlank() -> {
-                navController.navigate(Screen.TripDetails(dl.tripId)) { launchSingleTop = true }
-            }
+            !dl.threadId.isNullOrBlank() -> navController.navigate(Screen.Thread(dl.threadId)) { launchSingleTop = true }
+            !dl.tripId.isNullOrBlank() -> navController.navigate(Screen.TripDetails(dl.tripId)) { launchSingleTop = true }
             else -> {
                 openUpdatesSignal++
                 navController.navigate(Screen.Inbox) { launchSingleTop = true }
@@ -172,102 +168,153 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Search,
-            modifier = Modifier.padding(
-                bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp
-            )
+
+        // ✅ NavHost + Offline banner overlay (Uber kabi)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp
+                )
         ) {
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Search,
+                modifier = Modifier.fillMaxSize()
+            ) {
 
-            composable<Screen.Search> {
-                SearchScreen(
-                    onSearchClick = { from, to, date, pass ->
-                        navController.navigate(Screen.TripList(from, to, date, pass))
-                    }
-                )
-            }
-
-            composable<Screen.TripList> { backStackEntry ->
-                val args = backStackEntry.toRoute<Screen.TripList>()
-                TripListScreen(
-                    from = args.from,
-                    to = args.to,
-                    date = args.date,
-                    passengers = args.passengers,
-                    onBack = { navController.popBackStack() },
-                    onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
-                )
-            }
-
-            composable<Screen.TripDetails> { backStackEntry ->
-                val args = backStackEntry.toRoute<Screen.TripDetails>()
-                TripDetailsScreen(
-                    tripId = args.id,
-                    onBack = { navController.popBackStack() },
-                    onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
-                    onOpenInbox = { navController.navigate(Screen.Inbox) }
-                )
-            }
-
-            composable<Screen.Publish> {
-                PublishScreen(
-                    onPublished = {
-                        navController.navigate(Screen.MyTrips) {
-                            popUpTo(Screen.Search) { inclusive = false }
-                            launchSingleTop = true
+                composable<Screen.Search> {
+                    SearchScreen(
+                        onSearchClick = { from, to, date, pass ->
+                            navController.navigate(Screen.TripList(from, to, date, pass))
                         }
-                    }
-                )
-            }
+                    )
+                }
 
-            composable<Screen.MyTrips> {
-                MyTripsScreen(
-                    onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
-                )
-            }
+                composable<Screen.TripList> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Screen.TripList>()
+                    TripListScreen(
+                        from = args.from,
+                        to = args.to,
+                        date = args.date,
+                        passengers = args.passengers,
+                        onBack = { navController.popBackStack() },
+                        onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
+                    )
+                }
 
-            composable<Screen.Inbox> {
-                InboxHubScreen(
-                    onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
-                    onOpenTrip = { tripId -> navController.navigate(Screen.TripDetails(tripId)) },
-                    notifVm = notifVm,
-                    openUpdatesSignal = openUpdatesSignal
-                )
-            }
+                composable<Screen.TripDetails> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Screen.TripDetails>()
+                    TripDetailsScreen(
+                        tripId = args.id,
+                        onBack = { navController.popBackStack() },
+                        onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
+                        onOpenInbox = { navController.navigate(Screen.Inbox) }
+                    )
+                }
 
-            composable<Screen.Thread> { backStackEntry ->
-                val args = backStackEntry.toRoute<Screen.Thread>()
-                ThreadScreen(
-                    threadId = args.id,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            composable<Screen.Profile> {
-                ProfileScreen(onNavigate = { route -> navController.navigate(route) })
-            }
-
-            composable<Screen.ProfileEdit> { ProfileEditScreen(onBack = { navController.popBackStack() }) }
-            composable<Screen.Vehicle> { VehicleScreen(onBack = { navController.popBackStack() }) }
-            composable<Screen.Language> { LanguageScreen(onBack = { navController.popBackStack() }) }
-            composable<Screen.PaymentMethods> { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
-
-            // ✅ Settings
-            // ✅ Settings (Logout mantiqi bilan)
-            composable<Screen.Settings> {
-                SettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    onNavigate = { route -> navController.navigate(route) },
-                    onLogoutSuccess = {
-                        // 🚀 Eng muhim qator: Ilovadagi hamma narsani tozalaydi
-                        // va bosh ekranga (Search) otadi.
-                        // MainActivity dagi isLoggedIn flow buni sezib, avtomatik AuthScreen ni ochadi.
-                        navController.navigate(Screen.Search) {
-                            popUpTo(0) { inclusive = true }
+                composable<Screen.Publish> {
+                    PublishScreen(
+                        onPublished = {
+                            navController.navigate(Screen.MyTrips) {
+                                popUpTo(Screen.Search) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
-                    }
+                    )
+                }
+
+                composable<Screen.MyTrips> {
+                    MyTripsScreen(
+                        onTripClick = { tripId -> navController.navigate(Screen.TripDetails(tripId)) }
+                    )
+                }
+
+                composable<Screen.Inbox> {
+                    InboxHubScreen(
+                        onOpenThread = { threadId -> navController.navigate(Screen.Thread(threadId)) },
+                        onOpenTrip = { tripId -> navController.navigate(Screen.TripDetails(tripId)) },
+                        notifVm = notifVm,
+                        openUpdatesSignal = openUpdatesSignal
+                    )
+                }
+
+                composable<Screen.Thread> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Screen.Thread>()
+                    ThreadScreen(
+                        threadId = args.id,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Screen.Profile> {
+                    ProfileScreen(onNavigate = { route -> navController.navigate(route) })
+                }
+
+                composable<Screen.ProfileEdit> { ProfileEditScreen(onBack = { navController.popBackStack() }) }
+                composable<Screen.Vehicle> { VehicleScreen(onBack = { navController.popBackStack() }) }
+                composable<Screen.Language> { LanguageScreen(onBack = { navController.popBackStack() }) }
+                composable<Screen.PaymentMethods> { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
+
+                composable<Screen.Settings> {
+                    SettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) },
+                        onLogoutSuccess = {
+                            navController.navigate(Screen.Search) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+            }
+
+            // ✅ Global banner (tepa, status bar ostida)
+            OfflineBanner(
+                visible = !isOnline,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OFFLINE BANNER (Uber kabi, x tugmasi bilan)
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun OfflineBanner(visible: Boolean, modifier: Modifier = Modifier) {
+    // user x bosib yashirsa — online bo'lganda qaytadan reset bo'ladi
+    var dismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (!visible) dismissed = false
+    }
+
+    AnimatedVisibility(
+        visible = visible && !dismissed,
+        enter = slideInVertically { -it } + fadeIn(),
+        exit = slideOutVertically { -it } + fadeOut(),
+        modifier = modifier
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+            shadowElevation = 6.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Internetga ulanmagansiz. Iltimos, aloqani tekshiring",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = { dismissed = true }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Yopish")
+                }
             }
         }
     }
@@ -285,7 +332,6 @@ private fun MainBottomBar(
 ) {
     val cs = MaterialTheme.colorScheme
 
-    // ✅ hammasi 28
     val iconSize = 28.dp
     val publishIconSize = 28.dp
 
@@ -363,5 +409,5 @@ private fun NavDestination?.isProfileSection(): Boolean =
                 dest.hasRoute(Screen.Vehicle::class) ||
                 dest.hasRoute(Screen.Language::class) ||
                 dest.hasRoute(Screen.PaymentMethods::class) ||
-                dest.hasRoute(Screen.Settings::class) // ✅ Settings ham Profile tabga tegishli
+                dest.hasRoute(Screen.Settings::class)
     } == true

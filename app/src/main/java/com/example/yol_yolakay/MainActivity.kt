@@ -194,14 +194,19 @@ private fun AppRoot(
         initial = !sessionStore.accessTokenCached().isNullOrBlank()
     )
 
-    var authCompleted by remember { mutableStateOf(false) }
+    var authCompleted by remember { mutableStateOf(false) } // hozircha tegmaymiz
     var profileState by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
+    var retrySignal by remember { mutableStateOf(0) }
 
     val ctx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
     val hasFastDeepLink = remember(deepLink) {
         deepLink?.let { !it.threadId.isNullOrBlank() || !it.tripId.isNullOrBlank() } == true
+    }
+
+    fun retryProfileCheck() {
+        retrySignal++
     }
 
     LaunchedEffect(isLoggedIn) {
@@ -217,7 +222,8 @@ private fun AppRoot(
         }
     }
 
-    LaunchedEffect(isLoggedIn) {
+    // ✅ MUHIM: retrySignal ham profil tekshiruvini qayta ishga tushiradi
+    LaunchedEffect(isLoggedIn, retrySignal) {
         if (!isLoggedIn) {
             profileState = ProfileState.LoggedOut
             return@LaunchedEffect
@@ -229,17 +235,14 @@ private fun AppRoot(
             val name = p.displayName?.trim() ?: ""
             val needs = name.isBlank() || name.equals("Guest", ignoreCase = true)
             profileState = if (needs) ProfileState.NeedsCompletion else ProfileState.Complete
-        }.onFailure {
-            Log.e("AppRoot", "Profile check failed", it)
+        }.onFailure { e ->
+            Log.e("AppRoot", "Profile check failed", e)
             profileState = ProfileState.Error
         }
     }
 
     if (isLoggedIn && hasFastDeepLink) {
-        MainScreen(
-            deepLink = deepLink,
-            onDeepLinkHandled = onDeepLinkHandled
-        )
+        MainScreen(deepLink = deepLink, onDeepLinkHandled = onDeepLinkHandled)
         return
     }
 
@@ -252,22 +255,31 @@ private fun AppRoot(
         }
 
         ProfileState.Loading -> {
-            // ✅ Edge to edge bo'lganda elementlar qisilib qolmasligi uchun systemBarsPadding() qilingan
             Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
 
         ProfileState.Error -> {
-            // ✅ Edge to edge bo'lganda elementlar qisilib qolmasligi uchun systemBarsPadding() qilingan
             Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Internet bilan aloqa yo'q", style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { authCompleted = !authCompleted }) {
+
+                    // ✅ Endi haqiqiy retry
+                    Button(onClick = { retryProfileCheck() }) {
                         Text("Qayta urinish")
                     }
-                    Spacer(Modifier.height(16.dp))
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // ✅ Offline bo'lsa ham user “qamalib” qolmasin
+                    OutlinedButton(onClick = { profileState = ProfileState.Complete }) {
+                        Text("Davom etish")
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
                     TextButton(onClick = { scope.launch { sessionStore.clear() } }) {
                         Text("Chiqish")
                     }
@@ -283,10 +295,7 @@ private fun AppRoot(
         }
 
         ProfileState.Complete -> {
-            MainScreen(
-                deepLink = deepLink,
-                onDeepLinkHandled = onDeepLinkHandled
-            )
+            MainScreen(deepLink = deepLink, onDeepLinkHandled = onDeepLinkHandled)
         }
     }
 }

@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.io.IOException
 
 class SearchViewModel : ViewModel() {
 
@@ -16,6 +19,13 @@ class SearchViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState = _uiState.asStateFlow()
+
+    private fun Throwable.toUserMessage(): String = when (this) {
+        is UnknownHostException -> "Internet bilan aloqa yo‘q"
+        is SocketTimeoutException -> "Server javob bermadi. Keyinroq urinib ko‘ring"
+        is IOException -> "Tarmoq xatosi. Ulanishni tekshiring"
+        else -> this.message?.takeIf { it.isNotBlank() } ?: "Noma’lum xatolik"
+    }
 
     // UI
     fun onFromLocationChange(v: String) = _uiState.update { it.copy(fromLocation = v) }
@@ -39,8 +49,8 @@ class SearchViewModel : ViewModel() {
                 .onSuccess { list: List<TripApiModel> ->
                     _uiState.update { it.copy(isLoading = false, trips = list) }
                 }
-                .onFailure { e: Throwable ->
-                    _uiState.update { it.copy(isLoading = false, error = e.message) }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
                 }
         }
     }

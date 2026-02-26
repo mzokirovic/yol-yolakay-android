@@ -259,11 +259,13 @@ fun TripDetailsScreen(
     ) { pad ->
         Box(modifier = Modifier.padding(pad).fillMaxSize()) {
             when {
-                ui.isLoading -> {
+                // ✅ 1) Faqat birinchi yuklash: trip yo'q paytida full-screen
+                ui.isLoading && ui.trip == null -> {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 }
 
-                ui.error != null -> {
+                // ✅ 2) Trip yo'q + error: full-screen error
+                ui.trip == null && ui.error != null -> {
                     ErrorState(
                         message = ui.error!!,
                         onRetry = { viewModel.load(tripId) },
@@ -271,15 +273,14 @@ fun TripDetailsScreen(
                     )
                 }
 
-                trip == null -> {
-                    Text("Ma'lumot topilmadi", Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                // ✅ 3) Trip bor: doim contentni ko'rsatamiz (refresh bo'lsa ham)
+                ui.trip != null -> {
+                    val trip = ui.trip!!
 
-                else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp) // Karta orasi masofa
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
                             TripHeaderCard(
@@ -320,7 +321,6 @@ fun TripDetailsScreen(
                         }
 
                         item {
-                            // Sarlavhani ixchamlashtirdik va kartani tozaladik
                             SeatSectionCard {
                                 Text(
                                     text = "O'rindiqlar",
@@ -339,6 +339,19 @@ fun TripDetailsScreen(
                             }
                         }
                     }
+
+                    // ✅ Refresh xatoligi: full-screen emas, snackbar
+                    LaunchedEffect(ui.error) {
+                        ui.error?.let { snackbarHostState.showSnackbar(it) }
+                    }
+                }
+
+                else -> {
+                    Text(
+                        "Ma'lumot topilmadi",
+                        Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
